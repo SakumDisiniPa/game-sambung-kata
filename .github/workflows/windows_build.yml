@@ -1,0 +1,29 @@
+name: Build Windows Release
+
+on:
+  push:
+    branches: [ main ] # Ganti jika nama branch utama Anda bukan main
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          
+      - name: Get dependencies
+        run: flutter pub get
+        
+      - name: Build Windows
+        run: flutter build windows --release
+        
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: game-sambung-kata-windows
+          path: build/windows/x64/runner/Release/
