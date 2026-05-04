@@ -1,65 +1,73 @@
-# 🎮 Game Sambung Kata - P2P Multiplayer
+# 🎮 Game Sambung Kata - Multiplatform P2P & AI
 
-Aplikasi permainan **Sambung Kata** berbasis Flutter yang memungkinkan pemain bermain bersama dalam jaringan lokal menggunakan sistem **P2P (Peer-to-Peer)**. Game ini menantang kecepatan berpikir dan kosakata pemain untuk menyambung kata berdasarkan awalan (prefix) yang diberikan.
+Aplikasi permainan **Sambung Kata** berbasis Flutter yang modern dan kompetitif. Bisa dimainkan bersama teman dalam jaringan lokal (P2P) atau melawan komputer (AI) dengan berbagai tingkat kesulitan.
 
 ## ✨ Fitur Utama
+
 - **Multiplayer P2P Lokal**: Bermain bersama teman dalam satu jaringan Wi-Fi tanpa perlu server terpusat.
-- **UDP Discovery**: Sistem pencarian room otomatis menggunakan broadcast UDP. Pemain cukup memasukkan Kode Room untuk terhubung.
-- **Sistem Prefix Progresif**: Kesulitan meningkat seiring bertambahnya ronde. Awalan kata akan bertambah panjang (1-5 huruf) di fase *late game*.
-- **Sinkronisasi Real-time**: Ketikan lawan dapat dilihat secara langsung (*typing indicator*) untuk menambah keseruan.
-- **Kamus Internasional**: Validasi kata menggunakan dataset kosakata yang komprehensif (`datasetinternasional.csv`).
-- **Efek Suara & Visual Modern**: Antarmuka dengan tema *dark mode/cyan glow* dan efek suara interaktif.
+- **AI Opponent (Single Player)**: Lawan komputer dengan 3 tingkat kesulitan (Mudah, Normal, Sulit). AI memiliki perilaku manusiawi (bisa bingung, typo, dan kecepatan mengetik bervariasi).
+- **Sistem Skor & XP**: Dapatkan poin setiap kata benar. Poin bersifat publik dan tersimpan secara lokal (High Score).
+- **Auto-Update Native**: Sistem update otomatis di dalam aplikasi untuk Android (OTA APK) dan Desktop (ZIP Extractor).
+- **UDP Discovery**: Sistem pencarian room otomatis menggunakan broadcast UDP.
+- **Sinkronisasi Real-time**: Lihat apa yang diketik lawan secara langsung (*typing indicator*).
+- **Kamus Internasional**: Validasi kata menggunakan dataset kosakata yang luas.
+- **Aesthetic Cyberpunk UI**: Antarmuka modern dengan Google Fonts (Outfit), animasi halus, dan efek suara interaktif.
 
 ## 🛠️ Teknologi yang Digunakan
+
 - **Framework**: [Flutter](https://flutter.dev)
 - **State Management**: [Riverpod](https://riverpod.dev)
-- **Networking**:
-  - `shelf` & `shelf_web_socket` (Host Server)
-  - `web_socket_channel` (Client Connection)
-  - `RawDatagramSocket` (UDP Broadcasting untuk Discovery)
+- **Networking**: `shelf`, `shelf_web_socket`, `web_socket_channel`, `RawDatagramSocket` (UDP)
+- **Persistence**: `shared_preferences`
+- **Updates**: `ota_update` (Android), `http`, `archive` (ZIP Extraction)
 - **Audio**: `audioplayers`
-- **Fonts**: Google Fonts (Outfit)
 
-## 🏗️ Arsitektur & Cara Kerja Sistem
+## 🏗️ Mekanisme Unggulan
 
-### 1. Mekanisme Networking (P2P Hybrid)
-Game ini menggunakan model *Host-Client* yang berjalan secara lokal:
-- **Host Role**: Saat pemain membuat room, aplikasi menjalankan server HTTP/WebSocket (via `shelf`) dan mulai memancarkan sinyal (UDP Broadcast) di port `45451`. Sinyal ini berisi informasi: `SK_ID|KODE_ROOM|IP_ADDRESS|PORT`.
-- **Client Role**: Saat pemain ingin bergabung, aplikasi mendengarkan paket UDP di port yang sama. Jika Kode Room yang diterima cocok dengan yang dicari, Client akan langsung menginisiasi koneksi WebSocket ke IP Host.
-- **Data Sync**: Seluruh status permainan dikelola oleh Host dan disinkronkan ke Client setiap kali ada perubahan status (sinkronisasi state).
+### 1. Human-like AI Opponent
+AI tidak hanya sekadar menjawab, tapi mensimulasikan perilaku manusia:
+- **Mudah**: Kata pendek, ngetik lambat, sering typo dan bingung.
+- **Sulit**: Kata panjang, gacor, ngetik cepat, dan jarang salah.
+- **Simulasi Bingung**: AI bisa mengetik huruf acak lalu menghapusnya kembali (backspace) jika sedang "berpikir".
 
-### 2. Aturan Permainan (Game Rules)
-- **Input & Validasi**: Pemain harus mengetik kata yang dimulai dengan huruf awalan (prefix) yang ditentukan. Kata tersebut harus valid di kamus dan belum pernah digunakan sebelumnya dalam ronde tersebut.
-- **Sistem Nyawa (HP)**: Setiap pemain memiliki 4 nyawa. Nyawa akan berkurang jika:
-  1. Waktu habis (Timer mencapai 0).
-  2. Salah memasukkan kata sebanyak 3 kali berturut-turut dalam satu giliran.
-- **Skalabilitas Kesulitan**:
-  - **Early Game (Ronde < 20)**: Prefix diambil secara acak sebanyak 1-3 huruf dari akhir kata sebelumnya.
-  - **Late Game (Ronde >= 20)**: Prefix menjadi lebih menantang dengan panjang 3-5 huruf.
+### 2. Sistem Skor Dinamis
+- **Jawaban Benar**: +50 s/d +600 poin (random).
+- **Menang Game**: +600 s/d +1500 poin bonus.
+- **Kalah/Eliminasi**: -100 s/d -500 poin.
+- Skor pemain tampil di bawah profil (*Hearts*) dan bersifat publik (bisa dilihat semua pemain).
 
-### 3. Sinkronisasi Ketikan (Typing Indicator)
-Salah satu fitur unik adalah sinkronisasi ketikan. Setiap karakter yang diketik oleh pemain aktif akan dikirimkan secara real-time ke lawan melalui WebSocket, sehingga lawan bisa melihat apa yang sedang diketik sebelum kata tersebut di-submit.
+### 3. Native In-App Updater
+Aplikasi dapat memperbarui dirinya sendiri dengan mengambil `version.json` dari server:
+- **Android**: Otomatis mendownload APK dan memicu installer sistem.
+- **Windows/Linux**: Mendownload ZIP, mengekstrak, dan menjalankan script updater (`.sh`/`.ps1`) untuk mengganti file lama sambil menampilkan log proses.
 
-## 📂 Struktur Folder Utama
-```text
-lib/
-├── core/
-│   └── network/          # Logika Networking (UDP & WebSocket)
-├── features/
-│   └── game/
-│       ├── providers/    # Logic Provider (Riverpod)
-│       ├── views/        # UI Screen (GameView)
-│       └── widgets/      # Komponen UI (Keyboard, PlayerCard, dll)
-├── models/               # Data Model (GameState, GameRoom)
-└── services/             # Service (Dictionary, Audio, GameRules)
+## 🚀 Build & Distribusi
+
+Untuk memudahkan distribusi, gunakan script master release yang tersedia:
+
+```bash
+# Memberikan izin eksekusi
+chmod +x build_apk.sh
+
+# Jalankan script untuk build Linux & Android sekaligus
+./build_apk.sh
 ```
 
-## 🚀 Cara Menjalankan
-1. Pastikan Flutter SDK sudah terinstal.
-2. Clone repository dan jalankan `flutter pub get`.
-3. Pastikan semua perangkat berada dalam **jaringan Wi-Fi yang sama**.
-4. Jalankan aplikasi di dua perangkat atau lebih.
-5. Satu pemain memilih **BUAT ROOM**, pemain lain memilih **JOIN ROOM** dengan Kode Room yang sama.
+Script ini akan:
+1. Membersihkan folder distribusi lama di direktori web.
+2. Membuild Linux Bundle, men-ZIP-nya (`bundle.zip`), dan mengirim ke folder web.
+3. Membuild Android APK (`app-release.apk`) dan mengirim ke folder web.
+
+## 📂 Struktur Folder
+```text
+lib/
+├── core/             # Networking & App Constants
+├── features/
+│   ├── game/         # Logika & UI Permainan
+│   └── lobby/        # UI Lobby & Room Management
+├── models/           # GameState, UpdateInfo, dll
+└── services/         # AI, Update, Dictionary, Sound, Storage
+```
 
 ---
-**Dibuat oleh Sakum Studios**
+**Developed with ❤️ by Sakum Studios**

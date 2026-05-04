@@ -7,6 +7,9 @@ class DictionaryService {
   /// Check apakah dictionary sudah di-load
   bool get isLoaded => _dictionary.isNotEmpty;
 
+  /// Get semua kata dalam dictionary
+  List<String> get allWords => _dictionary.toList();
+
   /// Load dictionary dari CSV
   Future<void> loadDictionary() async {
     if (_dictionary.isNotEmpty) return;
@@ -53,6 +56,14 @@ class DictionaryService {
     final randomWord = (_dictionary.toList()..shuffle()).first;
     final len = length.clamp(1, randomWord.length);
     return randomWord.substring(0, len);
+  }
+
+  /// Cari semua kata yang dimulai dengan prefix
+  List<String> findWordsByPrefix(String prefix) {
+    final upperPrefix = prefix.toUpperCase().trim();
+    return _dictionary
+        .where((word) => word.startsWith(upperPrefix))
+        .toList();
   }
 
   /// Clear dictionary

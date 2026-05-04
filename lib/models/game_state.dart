@@ -14,6 +14,9 @@ class GameState {
   final List<String> usedWords; // Kata yang sudah digunakan
   final int roundNumber; // Jumlah ronde (untuk prefix progresif)
   final String lastFeedback; // Pesan feedback (kata sudah dipakai, dll)
+  final bool isVsComputer;
+  final String difficulty; // easy, medium, hard
+  final Map<String, int> playerScores;
 
   GameState({
     this.currentPrefix = 'A',
@@ -31,6 +34,9 @@ class GameState {
     this.usedWords = const [],
     this.roundNumber = 0,
     this.lastFeedback = '',
+    this.isVsComputer = false,
+    this.difficulty = 'medium',
+    this.playerScores = const {},
   });
 
   GameState copyWith({
@@ -49,6 +55,9 @@ class GameState {
     List<String>? usedWords,
     int? roundNumber,
     String? lastFeedback,
+    bool? isVsComputer,
+    String? difficulty,
+    Map<String, int>? playerScores,
   }) {
     return GameState(
       currentPrefix: currentPrefix ?? this.currentPrefix,
@@ -66,6 +75,9 @@ class GameState {
       usedWords: usedWords ?? this.usedWords,
       roundNumber: roundNumber ?? this.roundNumber,
       lastFeedback: lastFeedback ?? this.lastFeedback,
+      isVsComputer: isVsComputer ?? this.isVsComputer,
+      difficulty: difficulty ?? this.difficulty,
+      playerScores: playerScores ?? this.playerScores,
     );
   }
 
@@ -85,6 +97,9 @@ class GameState {
       'usedWords': List<String>.from(usedWords),
       'roundNumber': roundNumber,
       'lastFeedback': lastFeedback,
+      'isVsComputer': isVsComputer,
+      'difficulty': difficulty,
+      'playerScores': Map<String, int>.from(playerScores),
     };
   }
 
@@ -108,6 +123,12 @@ class GameState {
       usedWords: List<String>.from(map['usedWords'] ?? []),
       roundNumber: map['roundNumber'] as int? ?? 0,
       lastFeedback: map['lastFeedback'] as String? ?? '',
+      isVsComputer: map['isVsComputer'] as bool? ?? false,
+      difficulty: map['difficulty'] as String? ?? 'medium',
+      playerScores: (map['playerScores'] as Map?)?.map(
+            (k, v) => MapEntry(k.toString(), (v as num).toInt()),
+          ) ??
+          {},
     );
   }
 }

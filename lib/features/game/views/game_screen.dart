@@ -23,6 +23,12 @@ class _GameViewState extends ConsumerState<GameView>
   @override
   void initState() {
     super.initState();
+    // Lock to landscape for mobile
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
+    
     Future.microtask(() {
       final notifier = ref.read(gameLogicProvider.notifier);
       if (!notifier.isDictionaryLoaded) {
@@ -33,6 +39,13 @@ class _GameViewState extends ConsumerState<GameView>
 
   @override
   void dispose() {
+    // Reset to all orientations when leaving game
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
     _focusNode.dispose();
     super.dispose();
   }
@@ -193,6 +206,7 @@ class _GameViewState extends ConsumerState<GameView>
                       gameState.activePlayerIndex < gameState.players.length &&
                       gameState.players[gameState.activePlayerIndex] ==
                           gameState.players[0],
+                  gameState.playerScores[gameState.players[0]] ?? 0,
                 ),
               if (gameState.players.length > 1)
                 _buildPlayerProfile(
@@ -203,6 +217,7 @@ class _GameViewState extends ConsumerState<GameView>
                       gameState.activePlayerIndex < gameState.players.length &&
                       gameState.players[gameState.activePlayerIndex] ==
                           gameState.players[1],
+                  gameState.playerScores[gameState.players[1]] ?? 0,
                 ),
             ],
           ),
@@ -292,7 +307,7 @@ class _GameViewState extends ConsumerState<GameView>
   }
 
   Widget _buildPlayerProfile(
-      String name, int health, bool isEliminated, bool isActive) {
+      String name, int health, bool isEliminated, bool isActive, int score) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -363,6 +378,24 @@ class _GameViewState extends ConsumerState<GameView>
                       ? Colors.redAccent
                       : Colors.white.withAlpha(30),
                 ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          // Score
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(
+              color: Colors.cyanAccent.withAlpha(isActive ? 40 : 15),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              "$score PTS",
+              style: GoogleFonts.outfit(
+                fontSize: 11,
+                fontWeight: FontWeight.w900,
+                color: isEliminated ? Colors.white24 : Colors.cyanAccent,
+                letterSpacing: 1,
               ),
             ),
           ),
