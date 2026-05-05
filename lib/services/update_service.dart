@@ -26,8 +26,10 @@ class UpdateInfo {
 
   factory UpdateInfo.fromJson(Map<String, dynamic> json) {
     return UpdateInfo(
-      version: json['version'] ?? '1.0.0',
-      buildNumber: json['build_number'] ?? 0,
+      version: (json['version'] ?? '1.0.0').toString(),
+      buildNumber: json['build_number'] is int 
+          ? json['build_number'] 
+          : int.tryParse(json['build_number']?.toString() ?? '0') ?? 0,
       changelog: json['changelog'] ?? '',
       androidUrl: json['android_url'] ?? '',
       linuxUrl: json['linux_url'] ?? '',
@@ -48,12 +50,23 @@ class UpdateService {
         final info = UpdateInfo.fromJson(json.decode(response.body));
         final packageInfo = await PackageInfo.fromPlatform();
         
-        final currentVersion = packageInfo.version;
-        final currentBuild = int.tryParse(packageInfo.buildNumber) ?? 0;
+        final currentVersion = packageInfo.version.trim();
+        final currentBuild = int.tryParse(packageInfo.buildNumber.trim()) ?? 0;
+        
+        final serverVersion = info.version.trim();
+        final serverBuild = info.buildNumber;
 
-        // Bandingkan versi (Sederhana: jika versi atau build lebih tinggi)
-        if (_isVersionGreater(info.version, currentVersion) || info.buildNumber > currentBuild) {
+        debugPrint('[UPDATE] Checking: Local($currentVersion+$currentBuild) vs Server($serverVersion+$serverBuild)');
+
+        // Bandingkan versi secara mendalam
+        bool hasNewVersion = _isVersionGreater(serverVersion, currentVersion);
+        bool hasNewBuild = serverBuild > currentBuild && serverVersion == currentVersion;
+
+        if (hasNewVersion || hasNewBuild) {
+          debugPrint('[UPDATE] New update found!');
           return info;
+        } else {
+          debugPrint('[UPDATE] Application is up to date.');
         }
       }
     } catch (e) {
@@ -63,13 +76,21 @@ class UpdateService {
   }
 
   static bool _isVersionGreater(String newVersion, String currentVersion) {
-    List<int> v1 = newVersion.split('.').map(int.parse).toList();
-    List<int> v2 = currentVersion.split('.').map(int.parse).toList();
-    
-    for (int i = 0; i < v1.length; i++) {
-      if (i >= v2.length) return true;
-      if (v1[i] > v2[i]) return true;
-      if (v1[i] < v2[i]) return false;
+    try {
+      List<int> v1 = newVersion.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+      List<int> v2 = currentVersion.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+      
+      int maxLength = v1.length > v2.length ? v1.length : v2.length;
+      
+      for (int i = 0; i < maxLength; i++) {
+        int val1 = i < v1.length ? v1[i] : 0;
+        int val2 = i < v2.length ? v2[i] : 0;
+        
+        if (val1 > val2) return true;
+        if (val1 < val2) return false;
+      }
+    } catch (e) {
+      debugPrint('Error comparing versions: $e');
     }
     return false;
   }

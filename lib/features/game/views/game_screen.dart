@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../models/game_state.dart';
+import '../../../services/sound_service.dart';
 import '../providers/game_logic_provider.dart';
 import '../widgets/loading_state_widget.dart';
 
@@ -167,7 +168,20 @@ class _GameViewState extends ConsumerState<GameView>
                 const Center(child: LoadingStateWidget())
               else
                 SafeArea(
-                  child: _buildGameContent(gameState),
+                  child: Stack(
+                    children: [
+                      _buildGameContent(gameState),
+                      
+                      // Music Player di Tengah Atas
+                      Align(
+                        alignment: Alignment.topCenter,
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: 8.0),
+                          child: _buildMusicPlayer(),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
 
               // Game Over Overlay
@@ -268,7 +282,9 @@ class _GameViewState extends ConsumerState<GameView>
                     child: Text(
                       gameState.lastFeedback,
                       style: GoogleFonts.outfit(
-                        color: Colors.redAccent,
+                        color: gameState.lastFeedback == "BENAR!" 
+                            ? Colors.greenAccent 
+                            : Colors.redAccent,
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
                         letterSpacing: 1.2,
@@ -465,6 +481,14 @@ class _GameViewState extends ConsumerState<GameView>
     final displayWord = isMyTurn ? _typedWord : gameState.currentTypedWord;
     final letters = displayWord.split('').where((l) => l.isNotEmpty).toList();
     final prefixLetters = prefix.split('');
+    
+    final feedback = gameState.lastFeedback;
+    Color? statusColor;
+    if (feedback == 'BENAR!') {
+      statusColor = Colors.greenAccent;
+    } else if (feedback.contains('VALID') || feedback.contains('DIGUNAKAN')) {
+      statusColor = Colors.redAccent;
+    }
 
     return Wrap(
       alignment: WrapAlignment.center,
@@ -478,40 +502,141 @@ class _GameViewState extends ConsumerState<GameView>
         const SizedBox(width: 4),
 
         // Typed letters
-        ...letters.map((l) => _buildLetterBox(l)),
+        ...letters.map((l) => _buildLetterBox(l, statusColor: statusColor)),
 
         // Cursor box (empty, only if my turn)
-        if (isMyTurn)
-          _buildLetterBox("", isCursor: true),
+        if (isMyTurn && feedback.isEmpty)
+          _buildLetterBox("", isCursor: true, statusColor: statusColor),
       ],
     );
   }
 
+    Widget _buildMusicPlayer() {
+    final sound = SoundService();
+    return Container(
+      width: 250,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.black.withAlpha(150),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.cyanAccent.withAlpha(50)),
+        boxShadow: [
+          BoxShadow(color: Colors.cyanAccent.withAlpha(10), blurRadius: 10),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Nama Lagu & Controls
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.skip_previous, size: 20, color: Colors.white70),
+                onPressed: () async {
+                  await sound.prevSong();
+                  setState(() {});
+                },
+              ),
+              Expanded(
+                child: Column(
+                  children: [
+                    Text(
+                      sound.currentSongName.replaceAll('.mp3', ''),
+                      style: GoogleFonts.outfit(fontSize: 10, color: Colors.cyanAccent, fontWeight: FontWeight.bold),
+                      textAlign: TextAlign.center,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    // Progress Bar
+                    StreamBuilder<Duration>(
+                      stream: sound.onPositionChanged,
+                      builder: (context, snapshot) {
+                        final pos = snapshot.data ?? Duration.zero;
+                        return StreamBuilder<Duration>(
+                          stream: sound.onDurationChanged,
+                          builder: (context, snapshotDur) {
+                            final dur = snapshotDur.data ?? const Duration(seconds: 1);
+                            double progress = pos.inMilliseconds / dur.inMilliseconds;
+                            if (progress > 1.0) progress = 1.0;
+                            return Container(
+                              height: 2,
+                              width: 120,
+                              decoration: BoxDecoration(
+                                color: Colors.white12,
+                                borderRadius: BorderRadius.circular(1),
+                              ),
+                              child: FractionallySizedBox(
+                                alignment: Alignment.centerLeft,
+                                widthFactor: progress.clamp(0.0, 1.0),
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.cyanAccent,
+                                    borderRadius: BorderRadius.circular(1),
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                icon: Icon(
+                  sound.isPlaying ? Icons.pause : Icons.play_arrow,
+                  size: 20,
+                  color: Colors.white,
+                ),
+                onPressed: () async {
+                  await sound.togglePause();
+                  setState(() {});
+                },
+              ),
+              IconButton(
+                icon: const Icon(Icons.skip_next, size: 20, color: Colors.white70),
+                onPressed: () async {
+                  await sound.nextSong();
+                  setState(() {});
+                },
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildLetterBox(String letter,
-      {bool isCyan = false, bool isCursor = false}) {
+      {bool isCyan = false, bool isCursor = false, Color? statusColor}) {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 150),
       width: 52,
       height: 60,
       decoration: BoxDecoration(
-        color: isCyan
-            ? Colors.cyanAccent.withAlpha(30)
-            : (letter.isNotEmpty
-                ? Colors.white.withAlpha(15)
-                : Colors.white.withAlpha(6)),
+        color: statusColor != null 
+            ? statusColor.withAlpha(40)
+            : (isCyan
+                ? Colors.cyanAccent.withAlpha(30)
+                : (letter.isNotEmpty
+                    ? Colors.white.withAlpha(15)
+                    : Colors.white.withAlpha(6))),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isCyan
+          color: statusColor ?? (isCyan
               ? Colors.cyanAccent.withAlpha(180)
               : (isCursor
                   ? Colors.cyanAccent.withAlpha(80)
-                  : Colors.white.withAlpha(30)),
-          width: isCyan ? 2 : 1.5,
+                  : Colors.white.withAlpha(30))),
+          width: (isCyan || statusColor != null) ? 2 : 1.5,
         ),
-        boxShadow: isCyan
+        boxShadow: (isCyan || statusColor != null)
             ? [
                 BoxShadow(
-                    color: Colors.cyanAccent.withAlpha(20), blurRadius: 10),
+                    color: (statusColor ?? Colors.cyanAccent).withAlpha(20), 
+                    blurRadius: 10),
               ]
             : [],
       ),

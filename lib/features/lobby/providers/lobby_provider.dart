@@ -128,6 +128,12 @@ class LobbyNotifier extends StateNotifier<LobbyState> {
 
   void stopBGM() => _soundService.stopBGM();
 
+  /// Ambil ulang skor tertinggi dari storage (dipanggil pas game over)
+  Future<void> refreshHighScore() async {
+    final highScore = await _storageService.getHighScore();
+    state = state.copyWith(highScore: highScore);
+  }
+
   LocalGameService get gameService => _gameService;
 
   @override

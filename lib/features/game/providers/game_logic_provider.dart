@@ -9,13 +9,15 @@ import '../../../services/dictionary_service.dart';
 import '../../../services/game_rules_service.dart';
 import '../../../services/ai_service.dart';
 import '../../../services/storage_service.dart';
+import '../../lobby/providers/lobby_provider.dart';
 
 final gameLogicProvider = StateNotifierProvider<GameNotifier, GameState>((ref) {
-  return GameNotifier();
+  return GameNotifier(ref);
 });
 
 class GameNotifier extends StateNotifier<GameState> {
-  GameNotifier() : super(GameState()) {
+  final Ref? ref;
+  GameNotifier([this.ref]) : super(GameState()) {
     _aiService = AIService(_dictionaryService);
   }
 
@@ -28,6 +30,8 @@ class GameNotifier extends StateNotifier<GameState> {
   // Network config
   LocalGameService? _gameService;
   bool _isHost = false;
+  bool _isProcessing =
+      false; // Gembok untuk mencegah double submit / race condition
 
   bool get isDictionaryLoaded => _dictionaryService.isLoaded;
 
@@ -57,6 +61,9 @@ class GameNotifier extends StateNotifier<GameState> {
 
   /// Sinkronkan ketikan ke lawan (dipanggil oleh pemain aktif)
   void updateTyping(String word) {
+    if (state.currentTypedWord != word) {
+      _soundService.playTypingSFX();
+    }
     state = state.copyWith(currentTypedWord: word);
     if (_gameService != null) {
       _gameService!.sendMessage({
@@ -68,6 +75,9 @@ class GameNotifier extends StateNotifier<GameState> {
 
   /// Terima ketikan dari lawan
   void setTypedWord(String word) {
+    if (state.currentTypedWord != word) {
+      _soundService.playTypingSFX();
+    }
     state = state.copyWith(currentTypedWord: word);
   }
 
@@ -98,7 +108,8 @@ class GameNotifier extends StateNotifier<GameState> {
     });
 
     // Cek jika giliran komputer
-    if (state.isVsComputer && state.players[state.activePlayerIndex] == "Komputer") {
+    if (state.isVsComputer &&
+        state.players[state.activePlayerIndex] == "Komputer") {
       _triggerAI();
     }
   }
@@ -106,73 +117,89 @@ class GameNotifier extends StateNotifier<GameState> {
   void _triggerAI() {
     _aiThinkingTimer?.cancel();
     final delay = _aiService.getThinkingDelay(state.difficulty);
-    
+
     _aiThinkingTimer = Timer(delay, () async {
-      if (state.isGameOver || 
+      // Atomic check: ensure game state is still valid
+      if (state.isGameOver ||
           state.activePlayerIndex >= state.players.length ||
           state.players[state.activePlayerIndex] != "Komputer") {
         return;
       }
-      
-      String? word = _aiService.pickWord(state.currentPrefix, state.difficulty, state.usedWords);
-      
-      bool isConfusion = false;
-      
-      // Jika AI tidak nemu kata, atau akurasi gagal (pickWord balikin hasil pickWrongWord internally)
-      // Kita cek apakah kata yang dipilih valid. Kalau nggak valid, berarti itu confusion.
-      if (word == null || !_dictionaryService.isValidWord(word, state.currentPrefix)) {
-        isConfusion = true;
-        if (word == null) {
-          final rng = Random();
-          word = state.currentPrefix + String.fromCharCodes(Iterable.generate(rng.nextInt(3)+2, (_) => rng.nextInt(26) + 97));
+
+      // IMPORTANT: Hanya gunakan kata dari kamus yang VALID (tidak ada gibberish random)
+      String? word = _aiService.pickWord(
+          state.currentPrefix, state.difficulty, state.usedWords);
+
+      // Jika tidak ada kata valid, komputer surrender (timeout/blank)
+      if (word == null ||
+          !_dictionaryService.isValidWord(word, state.currentPrefix)) {
+        // Jeda panjang untuk simulasi "bingung", tapi TIDAK generate gibberish
+        await Future.delayed(const Duration(milliseconds: 1500));
+
+        // Cek ulang state validity sebelum action
+        if (!state.isGameOver &&
+            state.activePlayerIndex < state.players.length &&
+            state.players[state.activePlayerIndex] == "Komputer") {
+          // Submit kosong = komputer surrender (akan invalid, kurangi nyawa)
+          submitWord("", null);
         }
+        return;
       }
-      
-      await _simulateAITyping(word, isConfusion: isConfusion);
-      
-      if (!isConfusion) {
+
+      // Word VALID dari kamus, simulate typing normal (tanpa confusion)
+      await _simulateAITyping(word, isConfusion: false);
+
+      // Final check sebelum submit
+      if (!state.isGameOver &&
+          state.activePlayerIndex < state.players.length &&
+          state.players[state.activePlayerIndex] == "Komputer") {
         submitWord(word, null);
       }
     });
   }
 
-  Future<void> _simulateAITyping(String word, {bool isConfusion = false}) async {
+  Future<void> _simulateAITyping(String word,
+      {bool isConfusion = false}) async {
     final rng = Random();
     final difficulty = state.difficulty;
     final baseSpeed = _aiService.getTypingBaseSpeed(difficulty);
-    
+
     String currentText = "";
-    
+
     // Probabilitas typo per karakter
     // Easy: sering typo (15%), Hard: jarang (2%)
     double typoChance = 0.08;
     if (difficulty == 'easy') typoChance = 0.15;
     if (difficulty == 'hard') typoChance = 0.02;
-    const String keys = "abcdefghijklmnopqrstuvwxyz";
+    const String keys = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
-    for (int i = 0; i < word.length; i++) {
-      if (state.isGameOver || 
+    // CRITICAL FIX: Komputer cuma boleh ngetik LANJUTAN-nya saja (Suffix)
+    // Karena prefix sudah otomatis tampil di layar.
+    String suffix = word;
+    if (word.toUpperCase().startsWith(state.currentPrefix.toUpperCase())) {
+      suffix = word.substring(state.currentPrefix.length);
+    }
+
+    for (int i = 0; i < suffix.length; i++) {
+      if (state.isGameOver ||
           state.activePlayerIndex >= state.players.length ||
           state.players[state.activePlayerIndex] != "Komputer") {
         return;
       }
-      
-      // Simulasi Typo
+
+      // Simulasi Typo (random untuk setiap karakter)
       if (rng.nextDouble() < typoChance && i > 0) {
         // Pilih huruf acak buat typo
         String wrongChar = keys[rng.nextInt(keys.length)];
-        if (wrongChar == word[i].toLowerCase()) {
-          wrongChar = 'x'; // Just a fallback
-        }
         
         // Ketik yang salah
         currentText += wrongChar;
         updateTyping(currentText);
         await Future.delayed(Duration(milliseconds: rng.nextInt(150) + 100));
-        
+
         // Jeda bentar pas sadar salah (realization delay)
         await Future.delayed(Duration(milliseconds: rng.nextInt(300) + 200));
-        
+
         // Hapus yang salah (backspace)
         currentText = currentText.substring(0, currentText.length - 1);
         updateTyping(currentText);
@@ -180,33 +207,18 @@ class GameNotifier extends StateNotifier<GameState> {
       }
 
       // Ketik yang bener
-      currentText += word[i];
+      currentText += suffix[i];
       updateTyping(currentText);
-      
+
       // Delay ketik antar karakter (ada variasi biar manusiawi)
       final variation = rng.nextInt(baseSpeed ~/ 2);
       final typingDelay = Duration(milliseconds: baseSpeed + variation);
       await Future.delayed(typingDelay);
     }
-    
-    // Jika sedang bingung/confusion, tunggu bentar terus hapus semua (simulasi nyerah)
-    if (isConfusion) {
-      await Future.delayed(const Duration(milliseconds: 800));
-      for (int i = currentText.length; i > 0; i--) {
-        currentText = currentText.substring(0, i - 1);
-        updateTyping(currentText);
-        await Future.delayed(Duration(milliseconds: baseSpeed ~/ 2));
-      }
-    }
-    
-    if (state.isGameOver || 
-        state.activePlayerIndex >= state.players.length ||
-        state.players[state.activePlayerIndex] != "Komputer") {
-      return;
-    }
-        
-    await Future.delayed(Duration(milliseconds: rng.nextInt(300) + 300));
-    submitWord(word, null);
+
+    // Jeda sebelum kursor menghilang
+    await Future.delayed(Duration(milliseconds: rng.nextInt(200) + 150));
+    // NOTE: Jangan submit di sini! Submit dilakukan di _triggerAI() setelah method ini
   }
 
   /// Kurangi darah player
@@ -243,28 +255,37 @@ class GameNotifier extends StateNotifier<GameState> {
       // Update skor akhir
       final finalScores = Map<String, int>.from(state.playerScores);
       final rng = Random();
-      
+
       // Pemenang dapat bonus besar
       if (winner != null) {
-        finalScores[winner] = (finalScores[winner] ?? 0) + rng.nextInt(901) + 600;
+        finalScores[winner] =
+            (finalScores[winner] ?? 0) + rng.nextInt(901) + 600;
       }
-      
+
       // Yang kalah (yang baru saja dieliminasi) dikurangi poin
       finalScores[name] = (finalScores[name] ?? 0) - (rng.nextInt(401) + 100);
 
       state = state.copyWith(playerScores: finalScores);
-      
+
       // Simpan high score pemain lokal
-      final myName = state.players.isNotEmpty ? state.players[0] : null; // Asumsi player 0 adalah local user
+      final myName = state.players.isNotEmpty
+          ? state.players[0]
+          : null; // Asumsi player 0 adalah local user
       if (myName != null) {
-        StorageService().saveHighScore(finalScores[myName] ?? 0);
+        StorageService().saveHighScore(finalScores[myName] ?? 0).then((_) {
+          // Refresh skor di lobby biar realtime
+          if (ref != null) {
+            ref!.read(lobbyProvider.notifier).refreshHighScore();
+          }
+        });
       }
-      
+
       _broadcastState();
     } else {
       // Belum game over, tapi pemain ini kalah ronde (tereliminasi)
       final finalScores = Map<String, int>.from(state.playerScores);
-      finalScores[name] = (finalScores[name] ?? 0) - (Random().nextInt(401) + 100);
+      finalScores[name] =
+          (finalScores[name] ?? 0) - (Random().nextInt(401) + 100);
       state = state.copyWith(playerScores: finalScores);
       _nextTurn(forceRandomPrefix: true);
     }
@@ -312,7 +333,7 @@ class GameNotifier extends StateNotifier<GameState> {
   }
 
   Future<void> submitWord(String word, String? roomId) async {
-    if (state.isGameOver || state.isDictionaryLoading) return;
+    if (state.isGameOver || state.isDictionaryLoading || _isProcessing) return;
     if (state.players.isEmpty) return;
     if (state.activePlayerIndex >= state.players.length) return;
 
@@ -340,7 +361,8 @@ class GameNotifier extends StateNotifier<GameState> {
 
       if (state.turnChancesLeft <= 0) {
         _reduceHealth(state.players[state.activePlayerIndex]);
-      } else if (state.isVsComputer && state.players[state.activePlayerIndex] == "Komputer") {
+      } else if (state.isVsComputer &&
+          state.players[state.activePlayerIndex] == "Komputer") {
         // Trigger lagi kalau masih ada nyawa (kesempatan)
         _triggerAI();
       }
@@ -349,9 +371,14 @@ class GameNotifier extends StateNotifier<GameState> {
     }
 
     // 2. Cek validitas kata (ada di kamus & mulai dengan prefix)
-    final isValid = _dictionaryService.isValidWord(word, state.currentPrefix);
+    final isValid =
+        _dictionaryService.isValidWord(upperWord, state.currentPrefix);
 
     if (isValid) {
+      // Stop timer secepat mungkin hanya jika jawaban BENAR (karena mau pindah giliran)
+      _timer?.cancel();
+      _isProcessing =
+          true; // Kunci biar nggak ada submit lain pas lagi delay hijau
       _soundService.playSFX('correct');
 
       // Hitung panjang prefix berikutnya (Random & Progresif)
@@ -367,7 +394,8 @@ class GameNotifier extends StateNotifier<GameState> {
         if (chance < 0.15) {
           nextPrefixLen = 2; // 15% chance for 2 letters
         } else {
-          nextPrefixLen = rng.nextInt(3) + 3; // 85% chance for 3, 4, or 5 letters
+          nextPrefixLen =
+              rng.nextInt(3) + 3; // 85% chance for 3, 4, or 5 letters
         }
       }
 
@@ -375,15 +403,21 @@ class GameNotifier extends StateNotifier<GameState> {
 
       final newScores = Map<String, int>.from(state.playerScores);
       final currentPlayer = state.players[state.activePlayerIndex];
-      newScores[currentPlayer] = (newScores[currentPlayer] ?? 0) + rng.nextInt(551) + 50;
+      newScores[currentPlayer] =
+          (newScores[currentPlayer] ?? 0) + rng.nextInt(551) + 50;
 
       state = state.copyWith(
         playerScores: newScores,
         currentPrefix: nextPrefix,
         usedWords: [...state.usedWords, upperWord],
         roundNumber: state.roundNumber + 1,
-        lastFeedback: '', // Clear feedback
+        lastFeedback: 'BENAR!', // Tampilkan feedback hijau
       );
+
+      // Beri jeda sebentar biar pemain bisa liat warna hijaunya
+      await Future.delayed(const Duration(milliseconds: 400));
+
+      _isProcessing = false; // Buka kunci
       _nextTurn();
     } else {
       _soundService.playSFX('wrong');
@@ -395,7 +429,8 @@ class GameNotifier extends StateNotifier<GameState> {
 
       if (newChances <= 0) {
         _reduceHealth(state.players[state.activePlayerIndex]);
-      } else if (state.isVsComputer && state.players[state.activePlayerIndex] == "Komputer") {
+      } else if (state.isVsComputer &&
+          state.players[state.activePlayerIndex] == "Komputer") {
         // Trigger lagi kalau masih ada nyawa (kesempatan)
         _triggerAI();
       }
@@ -409,7 +444,9 @@ class GameNotifier extends StateNotifier<GameState> {
     // Jika host, siapkan awalan acak
     String initialPrefix = 'A';
     if (_isHost) {
-      if (!_dictionaryService.isLoaded) await _dictionaryService.loadDictionary();
+      if (!_dictionaryService.isLoaded) {
+        await _dictionaryService.loadDictionary();
+      }
       // Random length 1-3 untuk awal permainan
       final randomLen = Random().nextInt(3) + 1;
       initialPrefix = _dictionaryService.getRandomStartingPrefix(randomLen);
@@ -428,15 +465,40 @@ class GameNotifier extends StateNotifier<GameState> {
       lastFeedback: '',
       playerScores: {for (var p in players) p: 0},
     );
+
+    _setupInGameMusic();
+  }
+
+  void _setupInGameMusic() {
+    _soundService.setPlaylist([
+      'Segment_1122.0.mp3',
+      'Segment_20.0.mp3',
+      'Segment_2846.0.mp3',
+      'Segment_736.0.mp3',
+      'Segment_1322.0.mp3',
+      'Segment_2203.0.mp3',
+      'Segment_3120.0.mp3',
+      'Segment_891.0.mp3',
+      'Segment_1534.0.mp3',
+      'Segment_2383.0.mp3',
+      'Segment_3351.0.mp3',
+      'Segment_1789.0.mp3',
+      'Segment_2654.0.mp3',
+      'Segment_272.0.mp3',
+      'Segment_2001.0.mp3',
+      'Segment_3533.0.mp3',
+      'Segment_461.0.mp3'
+    ]);
+    _soundService.playPlaylist(random: true);
   }
 
   void startVsComputer(String playerName, String difficulty) async {
     _isHost = true; // Anggap sebagai host untuk proses lokal
     if (!_dictionaryService.isLoaded) await _dictionaryService.loadDictionary();
-    
+
     final players = [playerName, "Komputer"];
     final health = {for (var p in players) p: GameRulesService.maxHealth};
-    
+
     final randomLen = Random().nextInt(3) + 1;
     final initialPrefix = _dictionaryService.getRandomStartingPrefix(randomLen);
 
@@ -455,7 +517,8 @@ class GameNotifier extends StateNotifier<GameState> {
       difficulty: difficulty,
       playerScores: {for (var p in players) p: 0},
     );
-    
+
+    _setupInGameMusic();
     startTimer();
   }
 
