@@ -136,8 +136,8 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> with SingleTickerProv
               ),
             ),
             const Text(
-              "P2P Manual ID Edition",
-              style: TextStyle(color: Colors.white70),
+              "Global Online Edition",
+              style: TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.bold, letterSpacing: 1.2),
             ),
             const SizedBox(height: 50),
             
@@ -247,7 +247,7 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> with SingleTickerProv
           const CircularProgressIndicator(color: Colors.cyanAccent),
           const SizedBox(height: 30),
           Text(
-            lobbyState.isHost ? "MENUNGGU LAWAN..." : "MENCARI ROOM: ${_idController.text}...",
+            lobbyState.isHost ? "MENUNGGU LAWAN..." : "MENGHUBUNGKAN KE ROOM: ${_idController.text}...",
             style: GoogleFonts.outfit(fontSize: 20, color: Colors.white, letterSpacing: 2),
           ),
           const SizedBox(height: 10),

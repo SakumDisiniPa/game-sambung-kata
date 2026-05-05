@@ -52,11 +52,20 @@ class LobbyNotifier extends StateNotifier<LobbyState> {
 
   void _handleMessages(Map<String, dynamic> data) {
     if (data['type'] == 'join' && state.isHost) {
+      String newPlayerName = data['name'];
       final newPlayers = [...state.connectedPlayers];
-      if (!newPlayers.contains(data['name'])) {
-        newPlayers.add(data['name']);
-        state = state.copyWith(connectedPlayers: newPlayers);
+      
+      // Jika nama sama, tambahkan angka di belakangnya agar tidak konflik di UI
+      int count = 1;
+      String originalName = newPlayerName;
+      while (newPlayers.contains(newPlayerName)) {
+        count++;
+        newPlayerName = "$originalName ($count)";
       }
+
+      newPlayers.add(newPlayerName);
+      state = state.copyWith(connectedPlayers: newPlayers);
+      
       _gameService.sendMessage({
         "type": "player_list",
         "players": newPlayers,
@@ -114,9 +123,9 @@ class LobbyNotifier extends StateNotifier<LobbyState> {
     saveName(name);
     state = state.copyWith(isWaiting: true, isHost: false);
     
-    _gameService.startSearching(roomId, (room) {
+    // Langsung konek ke VPS menggunakan Room ID
+    _gameService.joinRoom(roomId, 8000, name).then((_) {
       if (!state.isWaiting) return;
-      _gameService.joinRoom(room.ip, room.port, name);
       onFound();
     });
   }

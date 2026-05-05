@@ -1,25 +1,24 @@
-# 🎮 Game Sambung Kata - Multiplatform P2P & AI
+# 🎮 Game Sambung Kata - Global Online Edition
 
-Aplikasi permainan **Sambung Kata** berbasis Flutter yang modern dan kompetitif. Bisa dimainkan bersama teman dalam jaringan lokal (P2P) atau melawan komputer (AI) dengan berbagai tingkat kesulitan.
+Aplikasi permainan **Sambung Kata** berbasis Flutter yang modern dan kompetitif. Kini mendukung mode **Online Multiplayer** di seluruh dunia melalui Relay Server, serta mode **AI Opponent** untuk latihan mandiri.
 
 ## ✨ Fitur Utama
 
-- **Multiplayer P2P Lokal**: Bermain bersama teman dalam satu jaringan Wi-Fi tanpa perlu server terpusat.
+- **Global Online Multiplayer**: Bermain bersama teman dari mana saja menggunakan Room ID melalui Relay Server Node.js.
+- **Relay Server & Cloudflare Tunnel**: Koneksi stabil dan aman menggunakan WebSocket (WSS) yang mendukung berbagai jaringan seluler.
 - **AI Opponent (Single Player)**: Lawan komputer dengan 3 tingkat kesulitan (Mudah, Normal, Sulit). AI memiliki perilaku manusiawi (bisa bingung, typo, dan kecepatan mengetik bervariasi).
+- **Custom Virtual Keyboard**: Keyboard in-game khusus untuk mobile yang estetik, responsif, dan tidak menutupi tampilan game.
+- **Portrait Mode Optimization**: Pengalaman bermain di HP yang lebih nyaman dengan layout tegak (Portrait).
 - **Music Player In-Game**: Playlist musik acak dari folder aset dengan kontrol penuh (Play/Pause, Skip, Back) dan progress bar real-time.
 - **Sistem Skor & XP Real-time**: Poin diperbarui secara instan dan skor tertinggi (High Score) tersinkronisasi otomatis setelah permainan selesai.
 - **Auto-Update Native**: Sistem update otomatis di dalam aplikasi untuk Android (OTA APK) dan Desktop (ZIP Extractor).
-- **UDP Discovery**: Sistem pencarian room otomatis menggunakan broadcast UDP.
-- **Interactive Audio**: Efek suara ketikan mesin tik (Typing SFX) yang terdengar untuk semua pemain, menambah atmosfer kompetitif.
-- **Visual Feedback**: Indikator warna dinamis (Hijau untuk benar, Merah untuk salah/duplikat) pada kotak input.
-- **Kamus Internasional**: Validasi kata menggunakan dataset kosakata yang luas.
 - **Aesthetic Cyberpunk UI**: Antarmuka modern dengan Google Fonts (Outfit), animasi halus, dan efek suara interaktif.
-
-## 🛠️ Teknologi yang Digunakan
 
 - **Framework**: [Flutter](https://flutter.dev)
 - **State Management**: [Riverpod](https://riverpod.dev)
-- **Networking**: `shelf`, `shelf_web_socket`, `web_socket_channel`, `RawDatagramSocket` (UDP)
+- **Backend**: Node.js WebSocket Server
+- **Tunneling**: Cloudflare Tunnel (WSS)
+- **Networking**: `web_socket_channel`, `http`
 - **Persistence**: `shared_preferences`
 - **Updates**: `ota_update` (Android), `http`, `archive` (ZIP Extraction)
 - **Audio**: `audioplayers`

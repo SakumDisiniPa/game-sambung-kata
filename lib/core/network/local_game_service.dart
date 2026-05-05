@@ -1,180 +1,90 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/foundation.dart';
-import 'package:network_info_plus/network_info_plus.dart';
-import 'package:shelf/shelf_io.dart' as shelf_io;
-import 'package:shelf_web_socket/shelf_web_socket.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import '../../models/game_room.dart';
 
 class LocalGameService {
-  static const int udpPort = 45451;
+  static const String vpsBaseUrl = "wss://api.sakum.my.id";
 
-  HttpServer? _server;
-  RawDatagramSocket? _udpHostSocket;
-  Timer? _broadcastTimer;
-  final List<WebSocketChannel> _clients = [];
-
-  WebSocketChannel? _clientChannel;
-  RawDatagramSocket? _udpClientSocket;
-  bool _hasJoined = false; // Flag: sudah konek belum?
+  WebSocketChannel? _channel;
   final StreamController<Map<String, dynamic>> _messageController =
       StreamController.broadcast();
   Stream<Map<String, dynamic>> get messages => _messageController.stream;
 
-  final StreamController<GameRoom> _discoveryController =
-      StreamController.broadcast();
-  Stream<GameRoom> get discoveredRooms => _discoveryController.stream;
-
+  // Untuk Online, kita tidak butuh server lokal atau UDP
   Future<String?> startHost(String roomId) async {
-    String? myIp;
-    try {
-      final interfaces = await NetworkInterface.list(
-        type: InternetAddressType.IPv4,
-      );
-      for (var interface in interfaces) {
-        for (var addr in interface.addresses) {
-          if (!addr.isLoopback && !addr.address.startsWith('169.254')) {
-            myIp = addr.address;
-            break;
-          }
-        }
-        if (myIp != null) break;
-      }
-    } catch (e) {
-      debugPrint("IP Error: $e");
-    }
-
-    myIp ??= await NetworkInfo().getWifiIP();
-    if (myIp == null) return null;
-
-    await stop();
-
-    var handler = webSocketHandler((dynamic webSocket, dynamic protocol) {
-      final channel = webSocket as WebSocketChannel;
-      _clients.add(channel);
-      channel.stream.listen((message) {
-        final data = jsonDecode(message);
-        _messageController.add(data);
-      }, onDone: () => _clients.remove(channel));
-    });
-
-    _server = await shelf_io.serve(handler, InternetAddress.anyIPv4, 0);
-    final port = _server!.port;
-
-    _udpHostSocket = await RawDatagramSocket.bind(InternetAddress.anyIPv4, 0);
-    _udpHostSocket!.broadcastEnabled = true;
-
-    _broadcastTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
-      final msg = "SK_ID|$roomId|$myIp|$port";
-      _udpHostSocket?.send(
-        utf8.encode(msg),
-        InternetAddress("255.255.255.255"),
-        udpPort,
-      );
-    });
-
-    return "$myIp:$port";
+    return _connect(roomId, "Host");
   }
 
   void broadcast(String message) {
-    for (var client in _clients) {
-      try {
-        client.sink.add(message);
-      } catch (e) {
-        debugPrint("Broadcast error: $e");
-      }
-    }
+    // Di mode Online (Relay), kita hanya perlu mengirim ke server, 
+    // server yang akan membagikan ke orang lain.
+    _channel?.sink.add(message);
   }
 
   Future<void> startSearching(
     String targetId,
     Function(GameRoom) onFound,
   ) async {
-    await stopDiscovery();
-    _hasJoined = false; // Reset flag
-    try {
-      _udpClientSocket = await RawDatagramSocket.bind(
-        InternetAddress.anyIPv4,
-        udpPort,
-      );
-      _udpClientSocket!.listen((RawSocketEvent event) {
-        if (_hasJoined) return; // Sudah konek, abaikan broadcast berikutnya
-        if (event == RawSocketEvent.read) {
-          final datagram = _udpClientSocket!.receive();
-          if (datagram != null) {
-            final msg = utf8.decode(datagram.data).trim();
-            if (msg.startsWith("SK_ID|")) {
-              final parts = msg.split('|');
-              if (parts.length == 4 && parts[1] == targetId) {
-                _hasJoined = true; // Tandai: sudah ketemu, jangan konek lagi!
-                stopDiscovery(); // Matiin radar
-                onFound(
-                  GameRoom(
-                    id: parts[1],
-                    ip: parts[2],
-                    port: int.parse(parts[3]),
-                  ),
-                );
-              }
-            }
-          }
-        }
-      });
-    } catch (e) {
-      debugPrint("Radar Error: $e");
-    }
+    // Di mode Online, kita langsung "tembak" room-nya saja
+    // Kita anggap room selalu ditemukan jika koneksi berhasil
+    onFound(GameRoom(id: targetId, ip: "vps", port: 8000));
   }
 
   Future<void> stopDiscovery() async {
-    _udpClientSocket?.close();
-    _udpClientSocket = null;
+    // Tidak ada lagi UDP yang perlu distop
   }
 
-  Future<void> joinRoom(String ip, int port, String myName) async {
-    return _connect(ip, port, myName);
+  Future<void> joinRoom(String roomId, int port, String myName) async {
+    // Parameter port diabaikan karena kita pakai port 8000 dari VPS
+    await _connect(roomId, myName);
   }
 
-  Future<void> _connect(String host, int port, String myName) async {
+  Future<String?> _connect(String roomId, String myName) async {
     try {
-      final url = 'ws://$host:$port';
-      _clientChannel = WebSocketChannel.connect(Uri.parse(url));
-      _clientChannel!.stream.listen(
+      final url = '$vpsBaseUrl/$roomId';
+      debugPrint("Connecting to Online Room: $url");
+      
+      _channel = WebSocketChannel.connect(Uri.parse(url));
+      
+      // Tunggu sebentar untuk memastikan koneksi berhasil (opsional)
+      // Kita dengarkan stream-nya
+      _channel!.stream.listen(
         (message) {
-          _messageController.add(jsonDecode(message));
+          try {
+            final data = jsonDecode(message);
+            _messageController.add(data);
+          } catch (e) {
+            debugPrint("Error decoding message: $e");
+          }
         },
         onDone: () {
-          debugPrint("Disconnected from Host");
+          debugPrint("Disconnected from VPS Server");
+        },
+        onError: (error) {
+          debugPrint("WebSocket Error: $error");
         },
       );
-      sendMessage({"type": "join", "name": myName});
+
+      // Kirim identitas awal
+      sendMessage({"type": "join", "name": myName, "roomId": roomId});
+      
+      return "online:$roomId";
     } catch (e) {
       debugPrint("Connect Fail: $e");
+      return null;
     }
   }
 
   void sendMessage(Map<String, dynamic> data) {
     final msg = jsonEncode(data);
-    if (_server != null) {
-      // Sebagai Host, simpan/proses secara lokal dan kirim ke semua client
-      _messageController.add(data);
-      broadcast(msg);
-    } else {
-      // Sebagai Client, kirim ke Host
-      _clientChannel?.sink.add(msg);
-    }
+    _channel?.sink.add(msg);
   }
 
   Future<void> stop() async {
-    _broadcastTimer?.cancel();
-    _broadcastTimer = null;
-    _udpHostSocket?.close();
-    _udpHostSocket = null;
-    _hasJoined = false;
-    await stopDiscovery();
-    await _server?.close();
-    await _clientChannel?.sink.close();
-    _clients.clear();
+    await _channel?.sink.close();
+    _channel = null;
   }
 }
+

@@ -15,7 +15,17 @@ subprojects {
     val newSubprojectBuildDir: Directory = newBuildDir.dir(project.name)
     project.layout.buildDirectory.value(newSubprojectBuildDir)
 }
+
 subprojects {
+    afterEvaluate {
+        if (project.extensions.findByName("android") != null) {
+            val android = project.extensions.getByName("android") as com.android.build.gradle.BaseExtension
+            if (android.namespace == null) {
+                // Beri namespace otomatis biar Gradle 8+ nggak marah
+                android.namespace = "com.sambungkata.${project.name.replace("-", "_")}"
+            }
+        }
+    }
     project.evaluationDependsOn(":app")
 }
 

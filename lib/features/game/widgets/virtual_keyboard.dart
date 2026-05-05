@@ -1,48 +1,27 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-class VirtualKeyboard extends StatefulWidget {
-  final Function(String) onSubmit;
-  final String currentPrefix;
+class VirtualKeyboard extends StatelessWidget {
+  final Function(String) onKeyTap;
+  final VoidCallback onBackspace;
+  final VoidCallback onSubmit;
 
   const VirtualKeyboard({
     super.key,
+    required this.onKeyTap,
+    required this.onBackspace,
     required this.onSubmit,
-    required this.currentPrefix,
   });
 
   @override
-  State<VirtualKeyboard> createState() => _VirtualKeyboardState();
-}
-
-class _VirtualKeyboardState extends State<VirtualKeyboard> {
-  String _currentWord = "";
-
-  @override
-  void didUpdateWidget(VirtualKeyboard oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    // Reset word jika prefix berubah (berarti sudah ganti giliran)
-    if (oldWidget.currentPrefix != widget.currentPrefix) {
-      _currentWord = "";
-    }
-  }
-
-  void _addKey(String key) {
-    setState(() {
-      _currentWord += key;
-    });
-  }
-
-  void _delete() {
-    if (_currentWord.isNotEmpty) {
-      setState(() {
-        _currentWord = _currentWord.substring(0, _currentWord.length - 1);
-      });
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
+    // Jangan munculkan di Desktop (kecuali Web untuk simulasi)
+    if (!kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
+      return const SizedBox.shrink();
+    }
+
     const rows = [
       ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
       ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L'],
@@ -50,51 +29,32 @@ class _VirtualKeyboardState extends State<VirtualKeyboard> {
     ];
 
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 10),
-      decoration: const BoxDecoration(
-        color: Colors.black87,
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(30),
-          topRight: Radius.circular(30),
-        ),
+      padding: const EdgeInsets.only(bottom: 20, top: 10, left: 5, right: 5),
+      decoration: BoxDecoration(
+        color: Colors.black.withAlpha(200),
+        border: Border(top: BorderSide(color: Colors.cyanAccent.withAlpha(50))),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Tampilan Kata yang sedang diketik
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
-            margin: const EdgeInsets.only(bottom: 15),
-            decoration: BoxDecoration(color: Colors.white12, borderRadius: BorderRadius.circular(15)),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(widget.currentPrefix, style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.cyanAccent)),
-                Text(_currentWord, style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)),
-              ],
-            ),
-          ),
-
           for (var row in rows)
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 5),
+              padding: const EdgeInsets.symmetric(vertical: 4),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   for (var key in row)
-                    _buildKey(key, flex: 1),
+                    _buildKey(key, () => onKeyTap(key)),
                 ],
               ),
             ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 5),
           Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _buildSpecialKey(Icons.backspace, _delete, flex: 2),
-              const SizedBox(width: 10),
-              _buildSpecialKey(Icons.check_circle, () {
-                widget.onSubmit(widget.currentPrefix + _currentWord);
-                setState(() => _currentWord = "");
-              }, flex: 3, color: Colors.cyanAccent),
+              _buildSpecialKey("DEL", Icons.backspace_outlined, onBackspace, flex: 2, color: Colors.redAccent),
+              const SizedBox(width: 8),
+              _buildSpecialKey("SUBMIT", Icons.send_rounded, onSubmit, flex: 3, color: Colors.cyanAccent),
             ],
           )
         ],
@@ -102,41 +62,75 @@ class _VirtualKeyboardState extends State<VirtualKeyboard> {
     );
   }
 
-  Widget _buildKey(String label, {int flex = 1}) {
+  Widget _buildKey(String label, VoidCallback onTap) {
     return Expanded(
-      flex: flex,
-      child: GestureDetector(
-        onTap: () => _addKey(label),
-        child: Container(
-          margin: const EdgeInsets.symmetric(horizontal: 4),
-          height: 50,
-          decoration: BoxDecoration(
-            color: Colors.white12,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.white24),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 2),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(6),
+            child: Container(
+              height: 45,
+              decoration: BoxDecoration(
+                color: Colors.white.withAlpha(20),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: Colors.white10),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                label,
+                style: GoogleFonts.outfit(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
           ),
-          alignment: Alignment.center,
-          child: Text(label, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         ),
       ),
     );
   }
 
-  Widget _buildSpecialKey(IconData icon, VoidCallback onTap, {int flex = 1, Color? color}) {
+  Widget _buildSpecialKey(String label, IconData icon, VoidCallback onTap, {int flex = 1, Color? color}) {
     return Expanded(
       flex: flex,
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          height: 50,
-          decoration: BoxDecoration(
-            color: color?.withAlpha(51) ?? Colors.white10,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 2),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: color ?? Colors.white24),
+            child: Container(
+              height: 50,
+              decoration: BoxDecoration(
+                color: color?.withAlpha(40) ?? Colors.white12,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: color?.withAlpha(150) ?? Colors.white24),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icon, color: color ?? Colors.white, size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    label,
+                    style: GoogleFonts.outfit(
+                      color: color ?? Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
-          child: Icon(icon, color: color ?? Colors.white),
         ),
       ),
     );
   }
 }
+

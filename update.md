@@ -1,31 +1,27 @@
-# 🚀 Sambung Kata - Update Log (v1.0.0+1)
+# 🚀 Changelog v1.7.0+1 - Global Online Update
 
-Daftar perubahan terbaru dan peningkatan fitur pada permainan Sambung Kata.
+## 🌐 Fitur Baru: Online Multiplayer
+- **Relay Server Support**: Migrasi dari koneksi lokal P2P ke server terpusat. Sekarang pemain bisa bermain antar jaringan (misal: Telkomsel vs Indihome).
+- **Room ID System**: Buat dan gabung room menggunakan kode unik 4-6 digit.
+- **WebSocket Synchronization**: Jabat tangan koneksi yang lebih stabil menggunakan protokol WSS (Secure WebSocket).
+- **Cloudflare Tunnel Integration**: Memungkinkan server berjalan di balik firewall ketat tanpa perlu konfigurasi port forwarding manual.
 
-## 🤖 Peningkatan AI (Computer Opponent)
-- **Simulasi Mengetik Manusia**: Komputer sekarang memiliki animasi mengetik karakter-per-karakter dengan kecepatan yang disesuaikan (Easy, Medium, Hard).
-- **Logika Typo & Berpikir**: Komputer terkadang melakukan kesalahan pengetikan atau kebingungan sesaat sebelum mengoreksi katanya, memberikan kesan bermain melawan manusia asli.
-- **Turn-Safety Logic**: Memperbaiki bug di mana komputer tetap mengirim jawaban setelah waktunya habis (Race Condition). Sekarang giliran jauh lebih stabil.
+## 📱 Mobile Experience
+- **Portrait Mode Locked**: Tampilan game sekarang terkunci di mode Portrait (berdiri) untuk kenyamanan bermain di smartphone.
+- **Custom Virtual Keyboard**: 
+  - Menggantikan keyboard bawaan sistem agar tidak menutupi tampilan game.
+  - Layout dioptimalkan untuk kecepatan mengetik.
+  - Mendukung input simultan dengan keyboard fisik (untuk tablet/desktop).
+- **Keyboard Auto-Focus**: Keyboard virtual otomatis muncul dan fokus saat giliran pemain tiba.
 
-## 🎵 Fitur Baru: Music Player In-Game
-- **Playlist Random**: Musik latar saat bermain sekarang diambil secara acak dari folder `assets/audio/ingame/`.
-- **Music Controller Bar**: Widget kontrol di bagian tengah atas layar untuk **Play/Pause**, **Skip Next**, dan **Previous**.
-- **Progress Bar**: Indikator durasi lagu berupa bar tipis cyan yang berjalan secara real-time.
-- **Auto-Transition**: Lagu akan otomatis berpindah ke lagu berikutnya saat durasi habis.
+## 🎨 Visual & Branding
+- **New App Icon**: Mengganti icon standar Flutter dengan logo resmi Sambung Kata.
+- **Responsive Layout**: Konten game di area tengah kini bersifat scrollable untuk mencegah overflow pada layar HP kecil saat keyboard aktif.
 
-## ✨ Peningkatan Visual & Feedback
-- **Color Glow Feedback**:
-  - **Hijau**: Menyala terang saat jawaban benar (disertai delay 400ms agar mata sempat melihat).
-  - **Merah**: Menyala saat kata tidak valid atau sudah pernah digunakan.
-- **Smart Cursor**: Kursor pengetikan akan disembunyikan saat umpan balik warna muncul untuk tampilan yang lebih bersih.
-- **Cyberpunk Aesthetics**: Penyesuaian transparansi (glassmorphism) pada berbagai elemen UI.
-
-## 🛠️ Perbaikan Teknis & Stabilitas
-- **Optimasi Volume**: Penyesuaian volume global (BGM: 0.3, SFX: 0.6) agar lebih nyaman di telinga.
-- **Smart Update System**: Memperbaiki deteksi versi aplikasi agar lebih akurat dan tidak memunculkan notifikasi update jika versi sudah sama.
-- **Asset Management**: Perbaikan pendaftaran aset audio di `pubspec.yaml` untuk mencegah crash saat loading lagu.
-- **Dependency Fix**: Mengembalikan library mabar (P2P) dan networking yang sempat hilang untuk memastikan fitur multiplayer tetap jalan.
-- **Build Automation**: Penyempurnaan script `build_apk.sh` untuk distribusi otomatis ke folder web hosting.
+## 🛠️ Perbaikan Bug
+- Menghapus dependensi UDP/P2P yang sering menyebabkan crash pada beberapa jaringan.
+- Memperbaiki penanganan nama pemain duplikat di dalam satu room (otomatis ditambahkan angka pembeda).
+- Optimasi pembersihan memori saat keluar dari game room.
 
 ---
-*Dibuat dengan ❤️ oleh Antigravity AI & SakumDisiniPa*
+*Update ini wajib untuk dapat menggunakan fitur Online Multiplayer.*

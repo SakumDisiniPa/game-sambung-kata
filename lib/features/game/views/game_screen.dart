@@ -6,6 +6,7 @@ import '../../../models/game_state.dart';
 import '../../../services/sound_service.dart';
 import '../providers/game_logic_provider.dart';
 import '../widgets/loading_state_widget.dart';
+import '../widgets/virtual_keyboard.dart';
 
 class GameView extends ConsumerStatefulWidget {
   final String playerName;
@@ -24,10 +25,9 @@ class _GameViewState extends ConsumerState<GameView>
   @override
   void initState() {
     super.initState();
-    // Lock to landscape for mobile
+    // Lock to portrait for mobile
     SystemChrome.setPreferredOrientations([
-      DeviceOrientation.landscapeLeft,
-      DeviceOrientation.landscapeRight,
+      DeviceOrientation.portraitUp,
     ]);
     
     Future.microtask(() {
@@ -123,10 +123,18 @@ class _GameViewState extends ConsumerState<GameView>
       if (prev?.currentPrefix != next.currentPrefix ||
           prev?.activePlayerIndex != next.activePlayerIndex) {
         setState(() => _typedWord = "");
+        // Auto focus if it's my turn (for physical keyboard)
+        final isMyTurn = next.players.isNotEmpty &&
+            next.activePlayerIndex < next.players.length &&
+            next.players[next.activePlayerIndex] == widget.playerName;
+        if (isMyTurn) {
+          _focusNode.requestFocus();
+        }
       }
     });
 
     return Scaffold(
+      resizeToAvoidBottomInset: true,
       body: Focus(
         focusNode: _focusNode,
         autofocus: true,
@@ -237,12 +245,14 @@ class _GameViewState extends ConsumerState<GameView>
           ),
         ),
 
-        // Center content
+        // Center content (Scrollable for mobile safety)
         Expanded(
-          child: Center(
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                const SizedBox(height: 20),
                 // Giliran siapa
                 if (gameState.players.isNotEmpty &&
                     gameState.activePlayerIndex < gameState.players.length)
@@ -314,10 +324,19 @@ class _GameViewState extends ConsumerState<GameView>
                       ),
                     ),
                   ),
+                const SizedBox(height: 20),
               ],
             ),
           ),
         ),
+
+        // Custom Virtual Keyboard
+        if (isMyTurn && !isEliminated && !gameState.isGameOver)
+          VirtualKeyboard(
+            onKeyTap: _addLetter,
+            onBackspace: _deleteLetter,
+            onSubmit: () => _submitWord(gameState.currentPrefix),
+          ),
       ],
     );
   }
