@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.game_sambung_kata"
+    namespace = "com.sakum.my.id"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -22,7 +22,7 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.game_sambung_kata"
+        applicationId = "com.sakum.my.id"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion // Minimal 21 untuk desugaring modern

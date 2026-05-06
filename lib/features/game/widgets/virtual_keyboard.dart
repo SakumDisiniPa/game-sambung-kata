@@ -22,48 +22,45 @@ class VirtualKeyboard extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    const rows = [
-      ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
-      ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L'],
-      ['Z', 'X', 'C', 'V', 'B', 'N', 'M'],
-    ];
-
     return Container(
-      padding: const EdgeInsets.only(bottom: 20, top: 10, left: 5, right: 5),
+      padding: const EdgeInsets.only(bottom: 25, top: 10, left: 4, right: 4),
       decoration: BoxDecoration(
-        color: Colors.black.withAlpha(200),
-        border: Border(top: BorderSide(color: Colors.cyanAccent.withAlpha(50))),
+        color: Colors.black.withAlpha(220),
+        border: Border(top: BorderSide(color: Colors.cyanAccent.withAlpha(40), width: 0.5)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          for (var row in rows)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  for (var key in row)
-                    _buildKey(key, () => onKeyTap(key)),
-                ],
-              ),
-            ),
-          const SizedBox(height: 5),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _buildSpecialKey("DEL", Icons.backspace_outlined, onBackspace, flex: 2, color: Colors.redAccent),
-              const SizedBox(width: 8),
-              _buildSpecialKey("SUBMIT", Icons.send_rounded, onSubmit, flex: 3, color: Colors.cyanAccent),
-            ],
-          )
+          // Row 1: Q-P (10 keys)
+          _buildKeyRow(['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P']),
+          const SizedBox(height: 6),
+          // Row 2: A-L + DEL (10 keys)
+          _buildKeyRow(['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', 'DEL']),
+          const SizedBox(height: 6),
+          // Row 3: Z-M + SUBMIT (7 + 1 keys = 10 units)
+          _buildKeyRow(['Z', 'X', 'C', 'V', 'B', 'N', 'M', 'SUBMIT']),
         ],
       ),
     );
   }
 
-  Widget _buildKey(String label, VoidCallback onTap) {
+  Widget _buildKeyRow(List<String> keys) {
+    return Row(
+      children: [
+        for (var key in keys)
+          if (key == 'DEL')
+            _buildSpecialKey("", Icons.backspace_outlined, onBackspace, flex: 1, color: Colors.redAccent)
+          else if (key == 'SUBMIT')
+            _buildSpecialKey("SUBMIT", Icons.send_rounded, onSubmit, flex: 3, color: Colors.cyanAccent)
+          else
+            _buildLetterKey(key, () => onKeyTap(key)),
+      ],
+    );
+  }
+
+  Widget _buildLetterKey(String label, VoidCallback onTap) {
     return Expanded(
+      flex: 1,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 2),
         child: Material(
@@ -72,18 +69,25 @@ class VirtualKeyboard extends StatelessWidget {
             onTap: onTap,
             borderRadius: BorderRadius.circular(6),
             child: Container(
-              height: 45,
+              height: 50,
               decoration: BoxDecoration(
-                color: Colors.white.withAlpha(20),
+                color: Colors.white.withAlpha(25),
                 borderRadius: BorderRadius.circular(6),
                 border: Border.all(color: Colors.white10),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black26,
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
               alignment: Alignment.center,
               child: Text(
                 label,
                 style: GoogleFonts.outfit(
                   color: Colors.white,
-                  fontSize: 18,
+                  fontSize: 19,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -103,27 +107,37 @@ class VirtualKeyboard extends StatelessWidget {
           color: Colors.transparent,
           child: InkWell(
             onTap: onTap,
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(6),
             child: Container(
               height: 50,
               decoration: BoxDecoration(
-                color: color?.withAlpha(40) ?? Colors.white12,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: color?.withAlpha(150) ?? Colors.white24),
+                color: color?.withAlpha(45) ?? Colors.white12,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: color?.withAlpha(120) ?? Colors.white24),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black26,
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(icon, color: color ?? Colors.white, size: 20),
-                  const SizedBox(width: 8),
-                  Text(
-                    label,
-                    style: GoogleFonts.outfit(
-                      color: color ?? Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
+                  if (label.isNotEmpty) ...[
+                    const SizedBox(width: 6),
+                    Text(
+                      label,
+                      style: GoogleFonts.outfit(
+                        color: color ?? Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        letterSpacing: 1,
+                      ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),

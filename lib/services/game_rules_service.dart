@@ -1,3 +1,5 @@
+import 'dart:math';
+
 class GameRulesService {
   static const int maxHealth = 4; // Darah maksimal
   static const int maxTurnChances = 3; // Kesempatan per giliran
@@ -52,5 +54,19 @@ class GameRulesService {
   /// Check if player should be eliminated (health <= 0)
   static bool shouldEliminate(int health) {
     return health <= 0;
+  }
+
+  /// Hitung panjang prefix berikutnya secara progresif (Max 5)
+  static int getNextPrefixLength(int roundNumber) {
+    final rng = Random();
+    if (roundNumber < 10) {
+      return rng.nextInt(2) + 1; // Ronde awal: 1-2 huruf
+    } else if (roundNumber < 25) {
+      return rng.nextInt(3) + 1; // Mulai panas: 1-3 huruf
+    } else if (roundNumber < 45) {
+      return rng.nextInt(3) + 2; // Menengah: 2-4 huruf
+    } else {
+      return rng.nextInt(3) + 3; // Late game: 3-5 huruf (Max 5)
+    }
   }
 }

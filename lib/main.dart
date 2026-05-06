@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'features/lobby/views/lobby_screen.dart';
+import 'features/intro/views/intro_screen.dart';
 
 void main() {
   runApp(const ProviderScope(child: SambungKataApp()));
@@ -24,7 +24,7 @@ class SambungKataApp extends StatelessWidget {
           brightness: Brightness.dark,
         ),
       ),
-      home: const LobbyScreen(),
+      home: const IntroScreen(),
     );
   }
 }

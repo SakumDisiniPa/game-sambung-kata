@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:ota_update/ota_update.dart';
 import '../../../services/update_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,6 +10,7 @@ import '../../game/views/game_screen.dart';
 import '../providers/lobby_provider.dart';
 import '../models/lobby_state.dart';
 import '../widgets/lobby_header.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class LobbyScreen extends ConsumerStatefulWidget {
   const LobbyScreen({super.key});
@@ -49,11 +51,13 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> with SingleTickerProv
   }
 
   void _navigateToGame(bool isHost) {
+    final lobbyState = ref.read(lobbyProvider);
     final lobbyNotifier = ref.read(lobbyProvider.notifier);
     final gameNotifier = ref.read(gameLogicProvider.notifier);
 
     gameNotifier.setNetworkConfig(lobbyNotifier.gameService, isHost);
-    gameNotifier.updatePlayers(ref.read(lobbyProvider).connectedPlayers);
+    gameNotifier.updatePlayers(lobbyState.connectedPlayers, lobbyState.selectedLanguage);
+    gameNotifier.updatePlayerPBs(lobbyNotifier.connectedPlayerPBs);
 
     gameNotifier.loadDictionary().then((_) {
       if (!mounted) return;
@@ -113,7 +117,7 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> with SingleTickerProv
           LobbyHeader(
             isMuted: lobbyState.isMuted,
             onMuteToggle: lobbyNotifier.toggleMute,
-            userName: _nameController.text,
+            userName: lobbyState.savedName.isEmpty ? _nameController.text : lobbyState.savedName,
           ),
         ],
       ),
@@ -141,37 +145,18 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> with SingleTickerProv
             ),
             const SizedBox(height: 50),
             
-            // Inputs
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 40),
-              child: Column(
-                children: [
-                  TextField(
-                    controller: _nameController,
-                    decoration: _inputDecoration("Nama Kamu", Icons.person),
-                  ),
-                  const SizedBox(height: 15),
-                  TextField(
-                    controller: _idController,
-                    keyboardType: TextInputType.number,
-                    decoration: _inputDecoration("KODE ROOM (Misal: 1234)", Icons.vpn_key),
-                  ),
-                ],
-              ),
-            ),
-            
-            const SizedBox(height: 40),
-
             // Buttons
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 _actionButton("BUAT ROOM", Colors.cyanAccent, Colors.black, () {
-                  lobbyNotifier.createRoom(_nameController.text, _idController.text);
+                  _showLanguageDialog(onSelected: (lang) {
+                    lobbyNotifier.createRoom(_nameController.text, lang);
+                  });
                 }),
                 const SizedBox(width: 20),
                 _actionButton("JOIN ROOM", Colors.white10, Colors.cyanAccent, () {
-                  lobbyNotifier.startAutoJoin(_nameController.text, _idController.text, () => _navigateToGame(false));
+                  _showJoinRoomDialog();
                 }, hasBorder: true),
               ],
             ),
@@ -180,7 +165,9 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> with SingleTickerProv
 
             // VS Computer Button
             ElevatedButton.icon(
-              onPressed: () => _showDifficultyDialog(),
+              onPressed: () => _showLanguageDialog(onSelected: (lang) {
+                _showDifficultyDialog(lang);
+              }),
               icon: const Icon(Icons.computer_rounded),
               label: const Text("LAWAN KOMPUTER"),
               style: ElevatedButton.styleFrom(
@@ -195,14 +182,71 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> with SingleTickerProv
             const SizedBox(height: 50),
             
             Text(
-              "SKOR TERTINGGI: ${lobbyState.highScore}",
+              "PB (REKOR KAMU): ${lobbyState.personalHighScore}",
               style: GoogleFonts.outfit(
                 fontSize: 14,
-                color: Colors.cyanAccent.withAlpha(150),
+                color: Colors.white70,
                 fontWeight: FontWeight.w600,
-                letterSpacing: 1.5,
+                letterSpacing: 1.2,
               ),
             ),
+
+            // Leaderboard Top 3
+            if (lobbyState.topPlayers.isNotEmpty) ...[
+              const SizedBox(height: 30),
+              Text(
+                "🏆 TOP PLAYERS 🏆",
+                style: GoogleFonts.outfit(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.orangeAccent,
+                  letterSpacing: 2,
+                ),
+              ),
+              const SizedBox(height: 15),
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 40),
+                padding: const EdgeInsets.all(15),
+                decoration: BoxDecoration(
+                  color: Colors.white.withAlpha(10),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.orangeAccent.withAlpha(50)),
+                ),
+                child: Column(
+                  children: [
+                    for (int i = 0; i < lobbyState.topPlayers.length; i++) ...[
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Row(
+                          children: [
+                            Text(
+                              "#${i + 1}",
+                              style: GoogleFonts.outfit(
+                                fontWeight: FontWeight.bold,
+                                color: i == 0 ? Colors.yellowAccent : Colors.white70,
+                              ),
+                            ),
+                            const SizedBox(width: 15),
+                            Expanded(
+                              child: Text(
+                                lobbyState.topPlayers[i]['player'] ?? "Anonim",
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                            Text(
+                              "${lobbyState.topPlayers[i]['score']}",
+                              style: const TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (i < lobbyState.topPlayers.length - 1)
+                        const Divider(color: Colors.white10),
+                    ],
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 10),
             Text(
               lobbyState.appVersion,
@@ -247,13 +291,13 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> with SingleTickerProv
           const CircularProgressIndicator(color: Colors.cyanAccent),
           const SizedBox(height: 30),
           Text(
-            lobbyState.isHost ? "MENUNGGU LAWAN..." : "MENGHUBUNGKAN KE ROOM: ${_idController.text}...",
+            lobbyState.isHost ? "MENUNGGU LAWAN..." : "MENGHUBUNGKAN KE ROOM: ${lobbyNotifier.lastRoomId}...",
             style: GoogleFonts.outfit(fontSize: 20, color: Colors.white, letterSpacing: 2),
           ),
           const SizedBox(height: 10),
           Text(
-            "ROOM ID: ${_idController.text}",
-            style: const TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.bold),
+            "ROOM ID: ${lobbyNotifier.lastRoomId}",
+            style: const TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.bold, fontSize: 24),
           ),
           const SizedBox(height: 40),
           if (lobbyState.connectedPlayers.isNotEmpty) ...[
@@ -265,6 +309,23 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> with SingleTickerProv
             )),
           ],
           const SizedBox(height: 50),
+          ElevatedButton.icon(
+            onPressed: () {
+              final inviteUrl = "https://sambungkata.sakum.my.id/join/${lobbyNotifier.lastRoomId}";
+              Clipboard.setData(ClipboardData(text: inviteUrl));
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text("Link undangan disalin ke clipboard!")),
+              );
+            },
+            icon: const Icon(Icons.share, color: Colors.black),
+            label: const Text("UNDANG TEMAN"),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.cyanAccent,
+              foregroundColor: Colors.black,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+          const SizedBox(height: 20),
           TextButton.icon(
             onPressed: () => lobbyNotifier.cancelWaiting(),
             icon: const Icon(Icons.close, color: Colors.redAccent),
@@ -342,16 +403,46 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> with SingleTickerProv
                   });
 
                   if (Platform.isAndroid) {
-                    UpdateService.updateAndroid(info.androidUrl)?.listen((event) {
+                    // Minta izin sebelum memulai update
+                    final statuses = await [
+                      Permission.storage,
+                      Permission.notification,
+                    ].request();
+
+                    if (statuses[Permission.storage]!.isDenied) {
                       setDialogState(() {
-                        if (event.status == OtaStatus.DOWNLOADING) {
-                          progress = double.tryParse(event.value ?? '0')! / 100;
-                          statusText = "Mendownload: ${event.value}%";
-                        } else if (event.status == OtaStatus.INSTALLING) {
-                          statusText = "Menyiapkan instalasi...";
-                        }
+                        statusText = "Butuh izin penyimpanan!";
+                        isDownloading = false;
                       });
-                    });
+                      return;
+                    }
+
+                    UpdateService.updateAndroid(info.androidUrl)?.listen(
+                      (event) {
+                        setDialogState(() {
+                          if (event.status == OtaStatus.DOWNLOADING) {
+                            // Pakai ?? 0 agar tidak crash jika parsing gagal
+                            final val = double.tryParse(event.value ?? '0') ?? 0;
+                            progress = val / 100;
+                            statusText = "Mendownload: ${event.value}%";
+                          } else if (event.status == OtaStatus.INSTALLING) {
+                            statusText = "Menyiapkan instalasi...";
+                          } else if (event.status == OtaStatus.PERMISSION_NOT_GRANTED_ERROR) {
+                            statusText = "Izin ditolak! Aktifkan 'Sumber Tidak Dikenal'.";
+                            isDownloading = false;
+                          } else if (event.status == OtaStatus.INTERNAL_ERROR) {
+                            statusText = "Error: ${event.value}";
+                            isDownloading = false;
+                          }
+                        });
+                      },
+                      onError: (e) {
+                        setDialogState(() {
+                          statusText = "Gagal: $e";
+                          isDownloading = false;
+                        });
+                      },
+                    );
                   } else {
                     final url = Platform.isLinux ? info.linuxUrl : info.windowsUrl;
                     try {
@@ -377,7 +468,50 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> with SingleTickerProv
     );
   }
 
-  void _showDifficultyDialog() {
+  void _showLanguageDialog({required Function(String) onSelected}) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+          side: const BorderSide(color: Colors.cyanAccent, width: 1),
+        ),
+        title: Row(
+          children: [
+            const Icon(Icons.language, color: Colors.cyanAccent),
+            const SizedBox(width: 12),
+            Text("Pilih Bahasa", style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _languageOption("INDONESIA", "Gunakan kosa kata Bahasa Indonesia", "🇮🇩", () {
+              Navigator.pop(context);
+              onSelected('indonesia');
+            }),
+            const Divider(color: Colors.white10),
+            _languageOption("ENGLISH", "Use English vocabulary", "🇺🇸", () {
+              Navigator.pop(context);
+              onSelected('english');
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _languageOption(String title, String desc, String flag, VoidCallback onTap) {
+    return ListTile(
+      leading: Text(flag, style: const TextStyle(fontSize: 24)),
+      title: Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+      subtitle: Text(desc, style: const TextStyle(color: Colors.white54, fontSize: 12)),
+      onTap: onTap,
+    );
+  }
+
+  void _showDifficultyDialog(String language) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -390,40 +524,92 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> with SingleTickerProv
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _difficultyOption("MUDAH", "AI sering salah dan lambat", Colors.greenAccent, 'easy'),
+            _difficultyOption("MUDAH", "AI sering salah dan lambat", Colors.greenAccent, 'easy', language),
             const Divider(color: Colors.white10),
-            _difficultyOption("NORMAL", "AI cukup menantang", Colors.blueAccent, 'medium'),
+            _difficultyOption("NORMAL", "AI cukup menantang", Colors.blueAccent, 'medium', language),
             const Divider(color: Colors.white10),
-            _difficultyOption("SULIT", "AI hampir tidak pernah salah", Colors.redAccent, 'hard'),
+            _difficultyOption("SULIT", "AI hampir tidak pernah salah", Colors.redAccent, 'hard', language),
           ],
         ),
       ),
     );
   }
 
-  Widget _difficultyOption(String title, String desc, Color color, String diff) {
+  Widget _difficultyOption(String title, String desc, Color color, String diff, String language) {
     return ListTile(
       title: Text(title, style: TextStyle(color: color, fontWeight: FontWeight.bold)),
       subtitle: Text(desc, style: const TextStyle(color: Colors.white70, fontSize: 12)),
       onTap: () async {
         if (!mounted) return;
         Navigator.pop(context);
-        if (_nameController.text.isEmpty) return;
+        final lobbyState = ref.read(lobbyProvider);
+        final displayName = _nameController.text.isEmpty 
+            ? (lobbyState.savedName.isEmpty ? 'Pemain' : lobbyState.savedName) 
+            : _nameController.text;
         
-        ref.read(lobbyProvider.notifier).saveName(_nameController.text);
-        ref.read(gameLogicProvider.notifier).startVsComputer(_nameController.text, diff);
+        try {
+          final lobbyNotifier = ref.read(lobbyProvider.notifier);
+          lobbyNotifier.saveName(displayName);
         
-        if (!mounted) return;
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => GameView(
-              playerName: _nameController.text,
-              isHost: true,
+          // Matikan koneksi jaringan sebelum main offline lawan komputer
+          lobbyNotifier.cancelWaiting(); 
+
+          final gameNotifier = ref.read(gameLogicProvider.notifier);
+          gameNotifier.startVsComputer(displayName, diff, language);
+          
+          // Set PB untuk mode komputer
+          final myPB = lobbyState.personalHighScore;
+          final compPB = diff == 'easy' ? 500 : (diff == 'medium' ? 2500 : 8000);
+          gameNotifier.updatePlayerPBs({displayName: myPB, "Komputer": compPB});
+          
+          if (!mounted) return;
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => GameView(
+                playerName: displayName,
+                isHost: true,
+              ),
             ),
-          ),
-        );
+          );
+        } catch (e) {
+          debugPrint("Error navigation: $e");
+        }
       },
+    );
+  }
+  void _showJoinRoomDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: Colors.cyanAccent, width: 1),
+        ),
+        title: Text("Gabung Room", style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text("Masukkan 4 Digit Kode Room lawan kamu", style: TextStyle(color: Colors.white54, fontSize: 12)),
+            const SizedBox(height: 20),
+            TextField(
+              controller: _idController,
+              keyboardType: TextInputType.number,
+              textAlign: TextAlign.center,
+              maxLength: 4,
+              style: const TextStyle(color: Colors.cyanAccent, fontSize: 24, fontWeight: FontWeight.bold, letterSpacing: 8),
+              decoration: _inputDecoration("KODE", Icons.vpn_key),
+            ),
+            const SizedBox(height: 20),
+            _actionButton("GABUNG SEKARANG", Colors.cyanAccent, Colors.black, () {
+              if (_idController.text.length < 4) return;
+              Navigator.pop(context);
+              ref.read(lobbyProvider.notifier).startAutoJoin(_nameController.text, _idController.text, () => _navigateToGame(false));
+            }),
+          ],
+        ),
+      ),
     );
   }
 }

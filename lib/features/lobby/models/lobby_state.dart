@@ -7,8 +7,11 @@ class LobbyState {
   final bool isMuted;
   final String myHostName;
   final String appVersion;
-  final int highScore;
+  final int globalHighScore;
+  final int personalHighScore;
+  final List<Map<String, dynamic>> topPlayers;
   final String savedName;
+  final String selectedLanguage;
   final UpdateInfo? availableUpdate;
 
   LobbyState({
@@ -18,8 +21,11 @@ class LobbyState {
     this.isMuted = false,
     this.myHostName = '',
     this.appVersion = '',
-    this.highScore = 0,
+    this.globalHighScore = 0,
+    this.personalHighScore = 0,
+    this.topPlayers = const [],
     this.savedName = '',
+    this.selectedLanguage = 'indonesia',
     this.availableUpdate,
   });
 
@@ -30,8 +36,11 @@ class LobbyState {
     bool? isMuted,
     String? myHostName,
     String? appVersion,
-    int? highScore,
+    int? globalHighScore,
+    int? personalHighScore,
+    List<Map<String, dynamic>>? topPlayers,
     String? savedName,
+    String? selectedLanguage,
     UpdateInfo? availableUpdate,
   }) {
     return LobbyState(
@@ -41,8 +50,11 @@ class LobbyState {
       isMuted: isMuted ?? this.isMuted,
       myHostName: myHostName ?? this.myHostName,
       appVersion: appVersion ?? this.appVersion,
-      highScore: highScore ?? this.highScore,
+      globalHighScore: globalHighScore ?? this.globalHighScore,
+      personalHighScore: personalHighScore ?? this.personalHighScore,
+      topPlayers: topPlayers ?? this.topPlayers,
       savedName: savedName ?? this.savedName,
+      selectedLanguage: selectedLanguage ?? this.selectedLanguage,
       availableUpdate: availableUpdate ?? this.availableUpdate,
     );
   }

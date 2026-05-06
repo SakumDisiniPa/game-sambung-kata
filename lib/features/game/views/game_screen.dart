@@ -221,6 +221,7 @@ class _GameViewState extends ConsumerState<GameView>
             children: [
               if (gameState.players.isNotEmpty)
                 _buildPlayerProfile(
+                  gameState,
                   gameState.players[0],
                   gameState.playerHealth[gameState.players[0]] ?? 4,
                   gameState.eliminatedPlayers.contains(gameState.players[0]),
@@ -232,6 +233,7 @@ class _GameViewState extends ConsumerState<GameView>
                 ),
               if (gameState.players.length > 1)
                 _buildPlayerProfile(
+                  gameState,
                   gameState.players[1],
                   gameState.playerHealth[gameState.players[1]] ?? 4,
                   gameState.eliminatedPlayers.contains(gameState.players[1]),
@@ -341,8 +343,8 @@ class _GameViewState extends ConsumerState<GameView>
     );
   }
 
-  Widget _buildPlayerProfile(
-      String name, int health, bool isEliminated, bool isActive, int score) {
+  Widget _buildPlayerProfile(GameState gameState, String name, int health,
+      bool isEliminated, bool isActive, int score) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -434,6 +436,19 @@ class _GameViewState extends ConsumerState<GameView>
               ),
             ),
           ),
+          // Personal Best (Rekor Terakhir)
+          if (gameState.playerPBs.containsKey(name))
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                "PB: ${gameState.playerPBs[name]}",
+                style: GoogleFonts.outfit(
+                  fontSize: 10,
+                  color: Colors.white54,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
           // Eliminated label
           if (isEliminated)
             Padding(

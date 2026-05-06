@@ -98,7 +98,7 @@ class UpdateService {
   /// Jalankan proses update berdasarkan platform
   static Stream<OtaEvent>? updateAndroid(String url) {
     try {
-      return OtaUpdate().execute(url, destinationFilename: 'game-update.apk');
+      return OtaUpdate().execute(url);
     } catch (e) {
       debugPrint('Gagal update Android: $e');
       return null;

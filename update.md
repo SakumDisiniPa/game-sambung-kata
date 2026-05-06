@@ -1,27 +1,24 @@
-# 🚀 Changelog v1.7.0+1 - Global Online Update
+# 🚀 Changelog v1.8.0+1 - The Cloud Identity Update
 
-## 🌐 Fitur Baru: Online Multiplayer
-- **Relay Server Support**: Migrasi dari koneksi lokal P2P ke server terpusat. Sekarang pemain bisa bermain antar jaringan (misal: Telkomsel vs Indihome).
-- **Room ID System**: Buat dan gabung room menggunakan kode unik 4-6 digit.
-- **WebSocket Synchronization**: Jabat tangan koneksi yang lebih stabil menggunakan protokol WSS (Secure WebSocket).
-- **Cloudflare Tunnel Integration**: Memungkinkan server berjalan di balik firewall ketat tanpa perlu konfigurasi port forwarding manual.
+## ☁️ Fitur Utama: Cloud Sync & Identity
+- **Global User Identity (UUID)**: Setiap perangkat sekarang memiliki ID Unik permanen. Rekor abang tidak akan tertukar meskipun ada pemain lain dengan nama yang sama.
+- **Auto-Profile Sync**: Saat aplikasi dibuka, data lokal (Nama & Skor) otomatis di-import ke server. Rekor abang langsung nampang di leaderboard dunia tanpa harus main ulang.
+- **Persistent Personal Best**: Skor tertinggi abang sekarang tersimpan aman di file biner terenkripsi `user.skm` dan disinkronkan ke cloud.
 
-## 📱 Mobile Experience
-- **Portrait Mode Locked**: Tampilan game sekarang terkunci di mode Portrait (berdiri) untuk kenyamanan bermain di smartphone.
-- **Custom Virtual Keyboard**: 
-  - Menggantikan keyboard bawaan sistem agar tidak menutupi tampilan game.
-  - Layout dioptimalkan untuk kecepatan mengetik.
-  - Mendukung input simultan dengan keyboard fisik (untuk tablet/desktop).
-- **Keyboard Auto-Focus**: Keyboard virtual otomatis muncul dan fokus saat giliran pemain tiba.
+## 🏆 Leaderboard & Kompetisi
+- **Global Top 3 Podium**: Lobby sekarang menampilkan 3 pemain terbaik di seluruh dunia secara real-time.
+- **In-Game PB Display**: Sekarang abang bisa melihat rekor tertinggi (Personal Best) musuh langsung di bawah profil mereka saat bertanding. Begitu juga sebaliknya!
+- **Identity-Based Leaderboard**: Sistem peringkat sekarang menggunakan User ID sebagai kunci, bukan lagi nama. Ganti nama tetap bisa, rekor tidak akan hilang.
 
-## 🎨 Visual & Branding
-- **New App Icon**: Mengganti icon standar Flutter dengan logo resmi Sambung Kata.
-- **Responsive Layout**: Konten game di area tengah kini bersifat scrollable untuk mencegah overflow pada layar HP kecil saat keyboard aktif.
+## 🤖 Mode Offline & AI
+- **Smart AI PB**: Lawan komputer sekarang memiliki rekor (PB) yang berbeda-beda sesuai tingkat kesulitan (Easy, Normal, Hard).
+- **Network Decoupling**: Perbaikan bug di mana game offline lawan komputer sempat mencoba mengirim data ke server. Sekarang mode offline benar-benar mandiri.
 
-## 🛠️ Perbaikan Bug
-- Menghapus dependensi UDP/P2P yang sering menyebabkan crash pada beberapa jaringan.
-- Memperbaiki penanganan nama pemain duplikat di dalam satu room (otomatis ditambahkan angka pembeda).
-- Optimasi pembersihan memori saat keluar dari game room.
+## 🛠️ Optimasi & Perbaikan Bug
+- **Linux Compatibility**: Memperbaiki masalah "Loading Selamanya" pada OS Linux dengan menambahkan pengaman pada sistem perizinan (Permission Gating).
+- **Room Switching Logic**: Memperbaiki bug "Global Lobby Log". Sekarang saat abang membuat room, koneksi ke lobby utama diputus dengan benar untuk masuk ke room privat.
+- **Profile Header Fix**: Memperbaiki nama di pojok kanan atas yang sempat macet di tulisan "Pemain". Sekarang nama langsung tersinkron dari data lokal saat startup.
+- **Smart JSON Backend**: Backend bermigrasi ke sistem penyimpanan JSON berbasis ID untuk menghindari error GLIBC pada VPS.
 
 ---
-*Update ini wajib untuk dapat menggunakan fitur Online Multiplayer.*
+*Nikmati pengalaman kompetisi global yang lebih adil dan transparan!*

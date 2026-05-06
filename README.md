@@ -11,6 +11,11 @@ Aplikasi permainan **Sambung Kata** berbasis Flutter yang modern dan kompetitif.
 - **Portrait Mode Optimization**: Pengalaman bermain di HP yang lebih nyaman dengan layout tegak (Portrait).
 - **Music Player In-Game**: Playlist musik acak dari folder aset dengan kontrol penuh (Play/Pause, Skip, Back) dan progress bar real-time.
 - **Sistem Skor & XP Real-time**: Poin diperbarui secara instan dan skor tertinggi (High Score) tersinkronisasi otomatis setelah permainan selesai.
+- **Smart Room ID & Auto-Hosting**: Host otomatis membuat kode room 4 digit acak untuk kemudahan berbagi.
+- **Deep Linking & Instant Invitations**: Berbagi link undangan (`https://sambungkata.sakum.my.id/join/xxxx`) yang otomatis membuka aplikasi atau dialihkan ke web-play.
+- **Cross-Platform Identity (UserID)**: Profil pemain, skor tertinggi, dan leaderboard tersinkronisasi otomatis di Android, Windows, Linux, dan Web menggunakan ID unik.
+- **Hybrid Storage & Cloud Sync**: Data tetap aman dan gigih (persistent) menggunakan enkripsi biner di desktop/mobile dan LocalStorage di web.
+- **Web-Play Support**: Mainkan versi penuh game langsung di browser melalui subdomain `play` dengan fitur auto-join dari link undangan.
 - **Auto-Update Native**: Sistem update otomatis di dalam aplikasi untuk Android (OTA APK) dan Desktop (ZIP Extractor).
 - **Aesthetic Cyberpunk UI**: Antarmuka modern dengan Google Fonts (Outfit), animasi halus, dan efek suara interaktif.
 

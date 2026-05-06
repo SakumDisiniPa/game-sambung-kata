@@ -8,8 +8,8 @@ import '../../../services/sound_service.dart';
 import '../../../services/dictionary_service.dart';
 import '../../../services/game_rules_service.dart';
 import '../../../services/ai_service.dart';
-import '../../../services/storage_service.dart';
 import '../../lobby/providers/lobby_provider.dart';
+import '../../../services/user_storage_service.dart';
 
 final gameLogicProvider = StateNotifierProvider<GameNotifier, GameState>((ref) {
   return GameNotifier(ref);
@@ -267,18 +267,34 @@ class GameNotifier extends StateNotifier<GameState> {
 
       state = state.copyWith(playerScores: finalScores);
 
-      // Simpan high score pemain lokal
-      final myName = state.players.isNotEmpty
-          ? state.players[0]
-          : null; // Asumsi player 0 adalah local user
-      if (myName != null) {
-        StorageService().saveHighScore(finalScores[myName] ?? 0).then((_) {
-          // Refresh skor di lobby biar realtime
-          if (ref != null) {
-            ref!.read(lobbyProvider.notifier).refreshHighScore();
-          }
-        });
-      }
+      // Kirim skor ke Backend (Global Leaderboard)
+      final myName = state.players.isNotEmpty ? state.players[0] : "Anonim";
+      final myScore = finalScores[myName] ?? 0;
+
+      // Simpan skor tertinggi pribadi (Personal Best) ke lokal .skm & Kirim ke Backend
+      final storage = UserStorageService();
+      
+      storage.getUserId().then((uid) {
+        if (_gameService != null) {
+          _gameService!.sendMessage({
+            "type": "submit_score",
+            "userId": uid,
+            "player": myName,
+            "score": myScore,
+          });
+        }
+        
+        return storage.getPersonalHighScore();
+      }).then((oldPB) {
+        if (myScore > oldPB) {
+          storage.saveUserData(name: myName, personalHighScore: myScore);
+        }
+        
+        // Refresh skor di lobby
+        if (ref != null) {
+          ref!.read(lobbyProvider.notifier).refreshHighScore();
+        }
+      });
 
       _broadcastState();
     } else {
@@ -326,9 +342,8 @@ class GameNotifier extends StateNotifier<GameState> {
   }
 
   Future<void> loadDictionary() async {
-    if (_dictionaryService.isLoaded) return;
     state = state.copyWith(isDictionaryLoading: true);
-    await _dictionaryService.loadDictionary();
+    await _dictionaryService.loadDictionary(state.language);
     state = state.copyWith(isDictionaryLoading: false);
   }
 
@@ -347,7 +362,9 @@ class GameNotifier extends StateNotifier<GameState> {
     }
 
     // Host: proses lokal
-    if (!_dictionaryService.isLoaded) await loadDictionary();
+    if (!_dictionaryService.isLoaded || _dictionaryService.currentLanguage != state.language) {
+      await loadDictionary();
+    }
 
     final upperWord = word.toUpperCase().trim();
 
@@ -381,25 +398,11 @@ class GameNotifier extends StateNotifier<GameState> {
           true; // Kunci biar nggak ada submit lain pas lagi delay hijau
       _soundService.playSFX('correct');
 
-      // Hitung panjang prefix berikutnya (Random & Progresif)
+      // Hitung panjang prefix berikutnya secara progresif (Max 5)
       final rng = Random();
-      int nextPrefixLen;
+      final nextPrefixLen = GameRulesService.getNextPrefixLength(state.roundNumber);
 
-      if (state.roundNumber < 20) {
-        // Awal game (Ronde < 20): Random 1-3 huruf
-        nextPrefixLen = rng.nextInt(3) + 1;
-      } else {
-        // Late game (Ronde >= 20): Dominan 3-5 huruf, kadang 2 huruf
-        final chance = rng.nextDouble();
-        if (chance < 0.15) {
-          nextPrefixLen = 2; // 15% chance for 2 letters
-        } else {
-          nextPrefixLen =
-              rng.nextInt(3) + 3; // 85% chance for 3, 4, or 5 letters
-        }
-      }
-
-      final nextPrefix = _dictionaryService.getPrefix(word, nextPrefixLen);
+      final nextPrefix = _dictionaryService.getValidSuffixPrefix(word, nextPrefixLen);
 
       final newScores = Map<String, int>.from(state.playerScores);
       final currentPlayer = state.players[state.activePlayerIndex];
@@ -438,14 +441,17 @@ class GameNotifier extends StateNotifier<GameState> {
     _broadcastState();
   }
 
-  void updatePlayers(List<String> players) async {
+  void updatePlayers(List<String> players, String language) async {
     final health = {for (var p in players) p: GameRulesService.maxHealth};
+
+    // Update state dengan bahasa yang dipilih
+    state = state.copyWith(language: language);
 
     // Jika host, siapkan awalan acak
     String initialPrefix = 'A';
     if (_isHost) {
-      if (!_dictionaryService.isLoaded) {
-        await _dictionaryService.loadDictionary();
+      if (!_dictionaryService.isLoaded || _dictionaryService.currentLanguage != language) {
+        await _dictionaryService.loadDictionary(language);
       }
       // Random length 1-3 untuk awal permainan
       final randomLen = Random().nextInt(3) + 1;
@@ -467,6 +473,11 @@ class GameNotifier extends StateNotifier<GameState> {
     );
 
     _setupInGameMusic();
+  }
+
+  void updatePlayerPBs(Map<String, int> pbs) {
+    state = state.copyWith(playerPBs: pbs);
+    _broadcastState();
   }
 
   void _setupInGameMusic() {
@@ -492,9 +503,15 @@ class GameNotifier extends StateNotifier<GameState> {
     _soundService.playPlaylist(random: true);
   }
 
-  void startVsComputer(String playerName, String difficulty) async {
+  void startVsComputer(String playerName, String difficulty, String language) async {
     _isHost = true; // Anggap sebagai host untuk proses lokal
-    if (!_dictionaryService.isLoaded) await _dictionaryService.loadDictionary();
+    
+    // Set language di state dulu agar loadDictionary tau mau load apa
+    state = state.copyWith(language: language);
+    
+    if (!_dictionaryService.isLoaded || _dictionaryService.currentLanguage != language) {
+      await _dictionaryService.loadDictionary(language);
+    }
 
     final players = [playerName, "Komputer"];
     final health = {for (var p in players) p: GameRulesService.maxHealth};
@@ -520,6 +537,34 @@ class GameNotifier extends StateNotifier<GameState> {
 
     _setupInGameMusic();
     startTimer();
+  }
+
+  void handlePlayerDisconnected(String disconnectedPlayer) {
+    if (state.isGameOver) return;
+    
+    // Jika player yang sisa cuma 1 (kita sendiri), nyatakan menang
+    if (state.players.contains(disconnectedPlayer)) {
+      _timer?.cancel();
+      
+      // Cari siapa yang masih bertahan
+      final remainingPlayers = state.players.where((p) => p != disconnectedPlayer).toList();
+      String winner = remainingPlayers.isNotEmpty ? remainingPlayers[0] : "No One";
+      
+      state = state.copyWith(
+        isGameOver: true, 
+        winner: winner,
+        lastFeedback: "$disconnectedPlayer KABUR! Kamu Menang!"
+      );
+      
+      _soundService.playSFX('Menang');
+      
+      // Berikan skor kemenangan instan
+      final newScores = Map<String, int>.from(state.playerScores);
+      newScores[winner] = (newScores[winner] ?? 0) + 1000;
+      state = state.copyWith(playerScores: newScores);
+      
+      _broadcastState();
+    }
   }
 
   void resetGame() {

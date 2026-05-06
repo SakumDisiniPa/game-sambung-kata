@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Konfigurasi Path
-WEB_PATH="/home/sakum-disini-pa/Documents/web-game-sambung-kata"
+WEB_PATH="/home/sakum-disini-pa/Downloads"
 WEB_ANDROID_DIR="$WEB_PATH/app/android"
 WEB_LINUX_DIR="$WEB_PATH/app/linux"
 

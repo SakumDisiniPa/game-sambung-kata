@@ -4,29 +4,39 @@ import 'package:flutter/services.dart';
 class DictionaryService {
   Set<String> _dictionary = {};
 
+  String? _currentLanguage;
+
   /// Check apakah dictionary sudah di-load
   bool get isLoaded => _dictionary.isNotEmpty;
+
+  String? get currentLanguage => _currentLanguage;
 
   /// Get semua kata dalam dictionary
   List<String> get allWords => _dictionary.toList();
 
-  /// Load dictionary dari CSV
-  Future<void> loadDictionary() async {
-    if (_dictionary.isNotEmpty) return;
+  /// Load dictionary berdasarkan bahasa
+  Future<void> loadDictionary(String language) async {
+    // Jika sudah load bahasa yang sama, skip
+    if (_dictionary.isNotEmpty && _currentLanguage == language) return;
 
     try {
-      final csvString = await rootBundle.loadString(
-        'assets/data/datasetinternasional.csv',
-      );
-      final lines = const LineSplitter().convert(csvString);
+      final String fileName = language.toLowerCase() == 'english' 
+          ? 'english.txt' 
+          : 'indonesia.txt';
+      
+      final dataString = await rootBundle.loadString('assets/data/$fileName');
+      final lines = const LineSplitter().convert(dataString);
+      
       _dictionary = lines
-          .skip(1)
           .map((l) => l.trim().toUpperCase())
           .where((l) => l.length > 1)
           .toSet();
+      
+      _currentLanguage = language;
     } catch (e) {
-      // Fallback dictionary jika CSV tidak ditemukan
-      _dictionary = {"AYAM", "BOLA", "KATA"};
+      // Fallback dictionary jika file tidak ditemukan
+      _dictionary = {"AYAM", "BOLA", "KATA", "APPLE", "BOOK", "GAME"};
+      _currentLanguage = language;
     }
   }
 
@@ -42,12 +52,29 @@ class DictionaryService {
     return upperWord.substring(upperWord.length - 1);
   }
 
-  /// Get prefix dari akhir kata dengan panjang tertentu
-  /// Untuk sistem prefix progresif (1-3 huruf)
-  String getPrefix(String word, int length) {
+  /// Mencari prefix dari akhiran kata yang valid (ada di kamus)
+  /// Mencoba dari panjang 'targetLength' mengecil ke 1
+  String getValidSuffixPrefix(String word, int targetLength) {
     final upperWord = word.toUpperCase().trim();
-    final len = length.clamp(1, upperWord.length);
-    return upperWord.substring(upperWord.length - len);
+    
+    for (int len = targetLength; len >= 1; len--) {
+      if (len > upperWord.length) continue;
+      final prefix = upperWord.substring(upperWord.length - len);
+      if (hasWordsStartingWith(prefix)) {
+        return prefix;
+      }
+    }
+    
+    // Fallback jika tidak ada akhiran yang valid, ambil random 1-2 huruf
+    return getRandomStartingPrefix(targetLength > 2 ? 2 : 1);
+  }
+
+  /// Cek apakah ada minimal satu kata yang dimulai dengan prefix ini
+  bool hasWordsStartingWith(String prefix) {
+    if (_dictionary.isEmpty) return false;
+    final upperPrefix = prefix.toUpperCase().trim();
+    // Menggunakan any() lebih cepat daripada where().isNotEmpty
+    return _dictionary.any((word) => word.startsWith(upperPrefix));
   }
 
   /// Ambil awalan acak (1-3 huruf) dari kata acak di kamus
